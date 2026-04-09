@@ -6,24 +6,35 @@ TMem 系统全局配置
 import os
 
 # ======================== 嵌入模型配置 ========================
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+# 嵌入后端: "sentence-transformers" (本地加载) 或 "ollama" (通过 Ollama API)
+EMBEDDING_BACKEND = os.environ.get("EMBEDDING_BACKEND", "ollama")
+# sentence-transformers 后端使用的模型名（HuggingFace 模型 ID 或本地路径）
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+# Ollama 后端使用的模型名
+OLLAMA_EMBEDDING_MODEL = os.environ.get("OLLAMA_EMBEDDING_MODEL", "mahonzhan/all-MiniLM-L6-v2")
+# Ollama embedding API 地址
+OLLAMA_EMBEDDING_URL = os.environ.get("OLLAMA_EMBEDDING_URL", "http://127.0.0.1:11434/api/embed")
 EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 的输出维度
 
 # ======================== LLM 配置 ========================
-LLM_MODEL = "gpt-4o-mini"  # 轻量LLM，用于主题标签生成等任务
-LLM_BASE_URL = "https://api.openai.com/v1"
-LLM_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+# 默认使用 OpenAI API；若使用 Ollama 本地模型，设置环境变量：
+#   export LLM_MODEL="qwen2.5:7b"                       # Ollama 中的模型名
+#   export LLM_BASE_URL="http://<server_ip>:11434/v1"    # Ollama 的 OpenAI 兼容端点
+#   export LLM_API_KEY="ollama"                          # Ollama 不校验 key，任意非空值即可
+LLM_MODEL = os.environ.get("LLM_MODEL", "qwen3:30b")
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "ollama"))
 LLM_TEMPERATURE = 0.3  # 较低温度以获得更稳定的结构化输出
 
 # ======================== Neo4j 图数据库配置 ========================
-NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:17687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "tmem2024")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "MyPass123")
 NEO4J_DATABASE = os.environ.get("NEO4J_DATABASE", "neo4j")
 
 # ======================== Qdrant 向量数据库配置 ========================
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
-QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
+QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "16333"))
 QDRANT_COLLECTION_MEMORIES = "tmem_memories"      # 记忆向量集合
 QDRANT_COLLECTION_TOPICS = "tmem_topics"          # 主题向量集合（标签+摘要嵌入）
 
