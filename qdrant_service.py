@@ -18,8 +18,8 @@ from qdrant_client.models import (
     PointStruct,
     Filter,
     FieldCondition,
-    MatchAny,
     MatchValue,
+    NamedVector,
 )
 
 import config
@@ -163,12 +163,12 @@ class QdrantService:
                 ]
             )
 
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=config.QDRANT_COLLECTION_MEMORIES,
-            query_vector=query_embedding.tolist(),
+            query=query_embedding.tolist(),
             query_filter=query_filter,
             limit=top_k,
-        )
+        ).points
 
         return [
             {
@@ -234,11 +234,11 @@ class QdrantService:
         self, query_embedding: np.ndarray, top_k: int = 10
     ) -> list[dict]:
         """用 query 向量在主题标签嵌入空间中检索最相似的主题"""
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=config.QDRANT_COLLECTION_TOPICS,
-            query_vector=("label", query_embedding.tolist()),
+            query=NamedVector(name="label", vector=query_embedding.tolist()),
             limit=top_k,
-        )
+        ).points
         return [
             {
                 "topic_id": hit.payload.get("topic_id", ""),
@@ -252,11 +252,11 @@ class QdrantService:
         self, query_embedding: np.ndarray, top_k: int = 10
     ) -> list[dict]:
         """用 query 向量在主题摘要嵌入空间中检索最相似的主题"""
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=config.QDRANT_COLLECTION_TOPICS,
-            query_vector=("summary", query_embedding.tolist()),
+            query=NamedVector(name="summary", vector=query_embedding.tolist()),
             limit=top_k,
-        )
+        ).points
         return [
             {
                 "topic_id": hit.payload.get("topic_id", ""),

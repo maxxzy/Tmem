@@ -28,6 +28,12 @@ class LLMService:
         self.model = model
         self.client = OpenAI(base_url=base_url, api_key=api_key)
 
+    @staticmethod
+    def _strip_think(text: str) -> str:
+        """去除 Qwen3 等模型的思维链 <think>...</think> 块"""
+        import re
+        return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
     def _chat(self, system_prompt: str, user_prompt: str) -> str:
         """基础聊天调用，返回模型文本响应"""
         response = self.client.chat.completions.create(
@@ -38,7 +44,8 @@ class LLMService:
                 {"role": "user", "content": user_prompt},
             ],
         )
-        return response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content.strip()
+        return self._strip_think(raw)
 
     def _chat_json(self, system_prompt: str, user_prompt: str) -> dict | list:
         """调用 LLM 并解析 JSON 响应"""
@@ -85,15 +92,17 @@ class LLMService:
         """
         topics_str = ", ".join(f'"{t}"' for t in topic_labels)
         system_prompt = (
-            "You are a memory extraction assistant. Extract key factual memories from the dialogue. "
+            "You are a memory extraction assistant. Extract ALL key factual memories from the dialogue. "
+            "Include personal facts, events, preferences, plans, opinions, and relationships mentioned. "
             "Each memory should be a complete, self-contained declarative statement. "
+            "Extract as many distinct memories as possible — do not merge multiple facts into one. "
             "Each memory must be tagged with relevant topics (select from the given topic set, multiple allowed), "
             "keywords, and an importance score (0-1)."
         )
         user_prompt = (
             f"Dialogue:\n{segment_text}\n\n"
             f"Available topic labels: [{topics_str}]\n\n"
-            "Extract structured memories and return as a JSON array:\n"
+            "Extract ALL factual memories from this dialogue. Return as a JSON array:\n"
             '[{"content": "memory content", "topics": ["topic1", "topic2"], '
             '"keywords": ["keyword1"], "importance": 0.7}]'
         )

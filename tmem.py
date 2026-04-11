@@ -67,7 +67,7 @@ class TMem:
         use_qdrant: bool = True,
     ):
         # 基础服务
-        self.emb_service = EmbeddingService(model_name=embedding_model)
+        self.emb_service = EmbeddingService()
         self.llm_service = LLMService(
             model=llm_model, base_url=llm_base_url, api_key=llm_api_key,
         )

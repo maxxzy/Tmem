@@ -43,7 +43,9 @@ LOCOMO_DATA_PATH = os.path.join(os.path.dirname(__file__), "locomo", "data", "lo
 
 # ======================== 主题分段配置 ========================
 # 相邻对话语义相似度低于此阈值时，视为候选主题边界
-TOPIC_BOUNDARY_SIMILARITY_THRESHOLD = 0.5
+TOPIC_BOUNDARY_SIMILARITY_THRESHOLD = 0.35
+# 主题段最小轮次数，少于此值时与前一段合并（避免过度碎片化）
+MIN_SEGMENT_TURNS = 3
 # 转折词列表，出现这些词时辅助判断主题边界
 TRANSITION_WORDS = [
     "By the way", "Speaking of", "On another note",

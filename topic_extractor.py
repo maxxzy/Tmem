@@ -93,9 +93,21 @@ class TopicExtractor:
             主题段列表，每个段包含连续的、主题一致的对话
         """
         boundaries = self.detect_topic_boundaries(turns)
+
+        # 过滤掉导致过短段的边界（最小段长度约束）
+        min_turns = config.MIN_SEGMENT_TURNS
+        filtered = []
+        prev = 0
+        for b in boundaries:
+            if b - prev >= min_turns:
+                filtered.append(b)
+                prev = b
+        # 确保最后一段也不会太短：如果最后一段 < min_turns 则移除最后一个边界
+        if filtered and len(turns) - filtered[-1] < min_turns:
+            filtered.pop()
+
         segments = []
-        # 在边界位置处切分（头尾加上 0 和 len(turns)）
-        split_points = [0] + boundaries + [len(turns)]
+        split_points = [0] + filtered + [len(turns)]
 
         for i in range(len(split_points) - 1):
             start, end = split_points[i], split_points[i + 1]
