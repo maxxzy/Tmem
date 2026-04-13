@@ -217,6 +217,8 @@ class TopicExtractor:
 
         memories = []
         for raw in raw_memories:
+            if not isinstance(raw, dict):
+                continue
             content = raw.get("content", "")
             if not content:
                 continue

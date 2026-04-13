@@ -161,63 +161,69 @@ class TopicAssociationGraph:
 
         仅检查 cos(e_i, e_j) ∈ (0.3, 0.6) 的主题对，
         相似度太高已被共现覆盖或属于同一 DAG 分支，太低大概率无关
+
+        为控制 LLM 调用量，候选对按离中心点 0.45 的距离排序，仅取前 MAX_CAUSAL_LLM_CALLS 个。
         """
         topic_list = [
             t for t in self.topics.values()
             if not t.is_virtual and t.label_embedding is not None
         ]
 
-        checked = set()
+        # 收集所有符合相似度区间的候选对
+        candidates = []
         for i, ta in enumerate(topic_list):
             for j, tb in enumerate(topic_list):
                 if i >= j:
                     continue
-                pair = self._ordered_pair(ta.topic_id, tb.topic_id)
-                if pair in checked:
-                    continue
-                checked.add(pair)
-
                 # 已有共现边的主题对不再重复检查
                 if (ta.topic_id, tb.topic_id) in self.edges or \
                    (tb.topic_id, ta.topic_id) in self.edges:
                     continue
 
-                # 计算向量相似度，仅在中等区间调用 LLM
                 sim = EmbeddingService.cosine_similarity(
                     ta.label_embedding, tb.label_embedding
                 )
-                if not (config.LLM_CAUSAL_SIM_LOW < sim < config.LLM_CAUSAL_SIM_HIGH):
-                    continue
+                if config.LLM_CAUSAL_SIM_LOW < sim < config.LLM_CAUSAL_SIM_HIGH:
+                    candidates.append((ta, tb, sim))
 
-                result = self.llm.judge_association(ta.label, tb.label)
-                if result is None:
-                    continue
+        # 按离中心点 0.45 的距离排序（越近越可能有关联），取 top-N
+        candidates.sort(key=lambda x: abs(x[2] - 0.45))
+        max_calls = config.MAX_CAUSAL_LLM_CALLS
+        logger.info(f"LLM 因果边候选对: {len(candidates)} 对，LLM 上限: {max_calls}")
 
-                score = result.get("score", 0.0)
-                etype = result.get("type", "causal")
-                direction = result.get("direction", "both")
+        for ta, tb, sim in candidates[:max_calls]:
+            result = self.llm.judge_association(ta.label, tb.label)
+            if result is None:
+                continue
 
-                if direction == "a->b":
-                    self._add_or_update_edge(
-                        ta.topic_id, tb.topic_id,
-                        llm_score=score, edge_type=etype,
-                    )
-                elif direction == "b->a":
-                    self._add_or_update_edge(
-                        tb.topic_id, ta.topic_id,
-                        llm_score=score, edge_type=etype,
-                    )
-                else:
-                    self._add_or_update_edge(
-                        ta.topic_id, tb.topic_id,
-                        llm_score=score, edge_type=etype,
-                    )
-                    self._add_or_update_edge(
-                        tb.topic_id, ta.topic_id,
-                        llm_score=score, edge_type=etype,
-                    )
+            score = result.get("score", 0.0)
+            etype = result.get("type", "causal")
+            direction = result.get("direction", "both")
 
-        logger.info(f"LLM 因果边构建完成，当前共 {len(self.edges)} 条边")
+            if direction == "a->b":
+                self._add_or_update_edge(
+                    ta.topic_id, tb.topic_id,
+                    llm_score=score, edge_type=etype,
+                )
+            elif direction == "b->a":
+                self._add_or_update_edge(
+                    tb.topic_id, ta.topic_id,
+                    llm_score=score, edge_type=etype,
+                )
+            else:
+                self._add_or_update_edge(
+                    ta.topic_id, tb.topic_id,
+                    llm_score=score, edge_type=etype,
+                )
+                self._add_or_update_edge(
+                    tb.topic_id, ta.topic_id,
+                    llm_score=score, edge_type=etype,
+                )
+
+        logger.info(
+            f"LLM 因果边构建完成（检查 {min(len(candidates), max_calls)}/{len(candidates)} 对），"
+            f"当前共 {len(self.edges)} 条边"
+        )
 
     # ======================== 边管理 ========================
 

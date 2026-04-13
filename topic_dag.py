@@ -145,6 +145,8 @@ class TopicDAG:
         for t in leaf_topics:
             t.parent_ids = set()
             t.child_ids = set()
+        # 清除 ROOT 的旧子节点引用
+        self.topics[ROOT_TOPIC_ID].child_ids = set()
         # 移除旧的虚拟节点（保留 ROOT）
         virtual_ids = [
             tid for tid, t in self.topics.items()
@@ -221,6 +223,8 @@ class TopicDAG:
             if tid in visited:
                 continue
             visited.add(tid)
+            if tid not in self.topics:
+                continue
             self.topics[tid].depth = depth
             for cid in self.topics[tid].child_ids:
                 if cid not in visited:
@@ -235,6 +239,8 @@ class TopicDAG:
         方法 (a)：基于相似度的候选父节点发现
           对每个主题 t_i，在非当前父节点的上层节点中找 sim > beta 的候选
         方法 (b)：LLM 辅助判断 is-a/part-of 关系，只保留确认的边
+
+        为控制 LLM 调用量，候选对按相似度降序排列，仅取前 MAX_MULTI_PARENT_LLM_CALLS 个询问 LLM。
         """
         leaf_topics = [
             t for t in self.topics.values()
@@ -245,27 +251,31 @@ class TopicDAG:
             if t.is_virtual and t.topic_id != ROOT_TOPIC_ID
         ]
 
+        # (a) 收集所有通过相似度阈值的候选对
+        candidates = []
         for child in leaf_topics:
             for candidate_parent in upper_topics:
-                # 跳过已有的父节点
                 if candidate_parent.topic_id in child.parent_ids:
                     continue
-                # 要求候选父节点深度更浅
                 if candidate_parent.depth >= child.depth:
                     continue
-
-                # (a) 相似度筛选
                 sim = self.compute_topic_similarity(child, candidate_parent)
-                if sim <= config.MULTI_PARENT_THRESHOLD:
-                    continue
+                if sim > config.MULTI_PARENT_THRESHOLD:
+                    candidates.append((child, candidate_parent, sim))
 
-                # (b) LLM 确认父子关系
-                if self.llm.judge_parent_child(child.label, candidate_parent.label):
-                    child.parent_ids.add(candidate_parent.topic_id)
-                    candidate_parent.child_ids.add(child.topic_id)
-                    logger.info(
-                        f"添加多父边: '{child.label}' → '{candidate_parent.label}'"
-                    )
+        # 按相似度降序排列，只取前 N 个询问 LLM
+        candidates.sort(key=lambda x: x[2], reverse=True)
+        max_calls = config.MAX_MULTI_PARENT_LLM_CALLS
+        logger.info(f"多父边候选对: {len(candidates)} 对，LLM 上限: {max_calls}")
+
+        for child, candidate_parent, sim in candidates[:max_calls]:
+            # (b) LLM 确认父子关系
+            if self.llm.judge_parent_child(child.label, candidate_parent.label):
+                child.parent_ids.add(candidate_parent.topic_id)
+                candidate_parent.child_ids.add(child.topic_id)
+                logger.info(
+                    f"添加多父边: '{child.label}' → '{candidate_parent.label}' (sim={sim:.3f})"
+                )
 
     # ======================== 步骤 5：动态更新 ========================
 

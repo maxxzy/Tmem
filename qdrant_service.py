@@ -19,7 +19,6 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
-    NamedVector,
 )
 
 import config
@@ -35,7 +34,7 @@ class QdrantService:
         host: str = config.QDRANT_HOST,
         port: int = config.QDRANT_PORT,
     ):
-        self.client = QdrantClient(host=host, port=port)
+        self.client = QdrantClient(host=host, port=port, check_compatibility=False)
         self._ensure_collections()
         logger.info(f"Qdrant 连接成功: {host}:{port}")
 
@@ -236,7 +235,8 @@ class QdrantService:
         """用 query 向量在主题标签嵌入空间中检索最相似的主题"""
         results = self.client.query_points(
             collection_name=config.QDRANT_COLLECTION_TOPICS,
-            query=NamedVector(name="label", vector=query_embedding.tolist()),
+            query=query_embedding.tolist(),
+            using="label",
             limit=top_k,
         ).points
         return [
@@ -254,7 +254,8 @@ class QdrantService:
         """用 query 向量在主题摘要嵌入空间中检索最相似的主题"""
         results = self.client.query_points(
             collection_name=config.QDRANT_COLLECTION_TOPICS,
-            query=NamedVector(name="summary", vector=query_embedding.tolist()),
+            query=query_embedding.tolist(),
+            using="summary",
             limit=top_k,
         ).points
         return [

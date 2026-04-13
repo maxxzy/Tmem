@@ -63,7 +63,9 @@ TOPIC_SIM_WEIGHTS = (0.4, 0.3, 0.3)  # alpha1, alpha2, alpha3
 HAC_DISTANCE_THRESHOLDS = [0.7, 0.5, 0.3]
 
 # 多归属阈值：主题与非当前父节点的上层节点相似度超过此值时添加多父边
-MULTI_PARENT_THRESHOLD = 0.6  # beta
+MULTI_PARENT_THRESHOLD = 0.7  # beta
+# 多父边 LLM 调用次数上限（按相似度降序取 top-N 候选对）
+MAX_MULTI_PARENT_LLM_CALLS = 50
 
 # 主题摘要更新触发条件：每新增这么多条记忆就重新生成摘要
 SUMMARY_UPDATE_INTERVAL = 5
@@ -85,6 +87,8 @@ MIN_COOCCURRENCE = 2  # n_min，最少共现次数
 # LLM 因果判断的候选对筛选区间（向量相似度）
 LLM_CAUSAL_SIM_LOW = 0.3
 LLM_CAUSAL_SIM_HIGH = 0.6
+# LLM 因果边调用次数上限（按相似度排序取 top-N 候选对）
+MAX_CAUSAL_LLM_CALLS = 30
 
 # 边权重的来源可信度权重 (共现NPMI, LLM评分, 时序NPMI)
 EDGE_WEIGHT_SOURCES = (0.5, 0.3, 0.2)  # w1, w2, w3
