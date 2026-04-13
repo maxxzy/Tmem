@@ -34,8 +34,29 @@ class LLMService:
         import re
         return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
-    def _chat(self, system_prompt: str, user_prompt: str, extra_params: dict | None = None) -> str:
-        """基础聊天调用，返回模型文本响应"""
+    @staticmethod
+    def _extract_json_from_text(text: str) -> dict | list:
+        """
+        在文本中搜索第一个有效的 JSON 数组或对象。
+        使用 json.JSONDecoder.raw_decode 进行正确的括号匹配。
+        优先查找数组 [...]，其次查找对象 {...}。
+        """
+        decoder = json.JSONDecoder()
+        for start_char in ("[", "{"):
+            search_from = 0
+            while search_from < len(text):
+                pos = text.find(start_char, search_from)
+                if pos == -1:
+                    break
+                try:
+                    result, _ = decoder.raw_decode(text, pos)
+                    return result
+                except json.JSONDecodeError:
+                    search_from = pos + 1
+        raise json.JSONDecodeError("No valid JSON found in text", text[:200], 0)
+
+    def _chat(self, system_prompt: str, user_prompt: str, extra_params: dict | None = None, *, return_raw: bool = False):
+        """基础聊天调用，返回模型文本响应。return_raw=True 时返回 (stripped, raw) 元组。"""
         kwargs = dict(
             model=self.model,
             temperature=config.LLM_TEMPERATURE,
@@ -48,19 +69,44 @@ class LLMService:
             kwargs.update(extra_params)
         response = self.client.chat.completions.create(**kwargs)
         raw = response.choices[0].message.content.strip()
-        return self._strip_think(raw)
+        stripped = self._strip_think(raw)
+        if return_raw:
+            return stripped, raw
+        return stripped
 
     def _chat_json(self, system_prompt: str, user_prompt: str, extra_params: dict | None = None) -> dict | list:
-        """调用 LLM 并解析 JSON 响应"""
-        raw = self._chat(system_prompt, user_prompt, extra_params)
-        if not raw:
-            raise json.JSONDecodeError("Empty response after stripping think block", "", 0)
-        # 尝试提取 JSON 块（LLM 可能包裹在 ```json ... ``` 中）
-        if "```json" in raw:
-            raw = raw.split("```json")[1].split("```")[0]
-        elif "```" in raw:
-            raw = raw.split("```")[1].split("```")[0]
-        return json.loads(raw.strip())
+        """调用 LLM 并解析 JSON 响应，多策略容错提取"""
+        stripped, raw = self._chat(
+            system_prompt, user_prompt + " /no_think", extra_params,
+            return_raw=True,
+        )
+
+        # 策略 1：从 think 剥离后的文本中解析 JSON（快速路径）
+        if stripped:
+            try:
+                text = stripped
+                if "```json" in text:
+                    text = text.split("```json")[1].split("```")[0]
+                elif "```" in text:
+                    text = text.split("```")[1].split("```")[0]
+                return json.loads(text.strip())
+            except json.JSONDecodeError:
+                pass
+
+        # 策略 2：在完整原始响应（含 think 块内容）中搜索 JSON
+        if raw:
+            try:
+                result = self._extract_json_from_text(raw)
+                logger.info("从 think 块中成功提取 JSON")
+                return result
+            except json.JSONDecodeError:
+                pass
+
+        raise json.JSONDecodeError(
+            f"All JSON extraction strategies failed (raw_len={len(raw) if raw else 0})",
+            raw[:200] if raw else "",
+            0,
+        )
 
     # ======================== 主题标签与关键词生成 ========================
 

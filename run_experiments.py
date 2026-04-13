@@ -88,7 +88,7 @@ def match_evidence(
     evidence_ids: list[str],
     evidence_lookup: dict[str, str],
     emb_service: EmbeddingService,
-    sim_threshold: float = 0.85,
+    sim_threshold: float = config.EVIDENCE_MATCH_SIM_THRESHOLD,
 ) -> dict[str, bool]:
     """
     对每个 evidence dia_id 判断是否被检索结果命中
@@ -156,7 +156,7 @@ def compute_precision_recall_at_k(
             eid_text = evidence_lookup.get(eid, "")
             if eid_text and r.memory.embedding is not None:
                 eid_emb = emb_service.encode(eid_text)
-                if float(np.dot(eid_emb, r.memory.embedding)) >= 0.85:
+                if float(np.dot(eid_emb, r.memory.embedding)) >= config.EVIDENCE_MATCH_SIM_THRESHOLD:
                     is_relevant = True
                     break
         if is_relevant:
@@ -630,7 +630,7 @@ def identify_cross_topic_qas(
                     continue
                 if mem.embedding is not None:
                     sim = float(np.dot(eid_emb, mem.embedding))
-                    if sim >= 0.85:
+                    if sim >= config.EVIDENCE_MATCH_SIM_THRESHOLD:
                         evidence_mids.add(mem.memory_id)
                         evidence_topics.update(mem.topic_ids)
 

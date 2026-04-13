@@ -122,6 +122,8 @@ MIN_ROUTED_TOPICS = 1
 INTRA_TOPIC_TOP_K = 10
 # 跨主题扩展的记忆权重折扣因子
 CROSS_TOPIC_WEIGHT_DISCOUNT = 0.7
+# 证据匹配 embedding 相似度阈值（用于评测时判断检索结果是否命中 evidence）
+EVIDENCE_MATCH_SIM_THRESHOLD = 0.6
 # 推理关键词，出现时触发跨主题扩展
 REASONING_KEYWORDS = [
     "why", "reason", "cause", "how come",

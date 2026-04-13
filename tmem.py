@@ -228,14 +228,28 @@ class TMem:
         )
         self.dag.build()
 
+        # 主题合并（必须在关联图构建之前，否则图中会残留已删除主题的边）
+        self.dag.check_and_merge_topics()
+
+        # 合并后重新同步 Qdrant 中受影响记忆的 payload（topic_ids 可能已变更）
+        if self.qdrant:
+            merged_mems = [
+                {
+                    "memory_id": mem.memory_id,
+                    "embedding": mem.embedding,
+                    "payload": mem.to_payload(),
+                }
+                for mem in self.memories.values()
+                if mem.embedding is not None
+            ]
+            if merged_mems:
+                self.qdrant.upsert_memories_batch(merged_mems)
+
         # 重建关联图
         self._graph = TopicAssociationGraph(
             self.topics, self.memories, self.emb_service, self.llm_service,
         )
         self.graph.build()
-
-        # 主题合并
-        self.dag.check_and_merge_topics()
 
         # 同步到 Neo4j
         if self.neo4j:

@@ -295,7 +295,7 @@ class TopicRetriever:
             avg_score = sum(r.score for r in intra_results) / len(intra_results)
             if avg_score < config.LOW_SCORE_THRESHOLD:
                 return True
-        return True  # 默认总是扩展，但给权重折扣
+        return False
 
     def retrieve_cross_topic(
         self,

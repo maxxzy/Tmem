@@ -96,7 +96,7 @@ class QdrantService:
             collection_name=config.QDRANT_COLLECTION_MEMORIES,
             points=[
                 PointStruct(
-                    id=self._str_to_int_id(memory_id),
+                    id=memory_id,
                     vector=embedding.tolist(),
                     payload={**payload, "memory_id": memory_id},
                 )
@@ -117,7 +117,7 @@ class QdrantService:
             return
         points = [
             PointStruct(
-                id=self._str_to_int_id(m["memory_id"]),
+                id=m["memory_id"],
                 vector=m["embedding"].tolist(),
                 payload={**m["payload"], "memory_id": m["memory_id"]},
             )
@@ -222,7 +222,7 @@ class QdrantService:
             collection_name=config.QDRANT_COLLECTION_TOPICS,
             points=[
                 PointStruct(
-                    id=self._str_to_int_id(topic_id),
+                    id=topic_id,
                     vector=vectors,
                     payload={**payload, "topic_id": topic_id},
                 )
@@ -268,12 +268,6 @@ class QdrantService:
         ]
 
     # ======================== 工具方法 ========================
-
-    @staticmethod
-    def _str_to_int_id(s: str) -> int:
-        """将 UUID 字符串转换为正整数 ID（Qdrant 需要整数或 UUID 格式）"""
-        # 使用 hash 取绝对值作为 point id
-        return abs(hash(s)) % (2**63)
 
     def get_collection_count(self, collection_name: str) -> int:
         """获取集合中的向量数量"""

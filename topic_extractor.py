@@ -11,6 +11,8 @@
 import logging
 from datetime import datetime
 
+import re
+
 import numpy as np
 
 import config
@@ -67,9 +69,10 @@ class TopicExtractor:
             sim = EmbeddingService.cosine_similarity(
                 turns[i - 1].embedding, turns[i].embedding
             )
-            # 检测当前对话是否包含转折词
+            # 检测当前对话是否包含转折词（单词边界 + 大小写不敏感）
             has_transition = any(
-                tw in turns[i].content for tw in config.TRANSITION_WORDS
+                re.search(r'\b' + re.escape(tw) + r'\b', turns[i].content, re.IGNORECASE)
+                for tw in config.TRANSITION_WORDS
             )
             # 相似度低于阈值，或包含转折词且相似度不太高 → 主题边界
             if sim < config.TOPIC_BOUNDARY_SIMILARITY_THRESHOLD:
@@ -185,6 +188,8 @@ class TopicExtractor:
                 topic_ids.append(new_topic.topic_id)
                 logger.info(f"创建新主题: '{label}' (id={new_topic.topic_id[:8]})")
 
+        # 去重（多个 LLM 标签可能匹配到同一已有主题）
+        topic_ids = list(dict.fromkeys(topic_ids))
         segment.topic_ids = topic_ids
         return topic_ids
 
@@ -226,10 +231,29 @@ class TopicExtractor:
             # 将 LLM 返回的主题标签名映射回 topic_id
             mem_topic_ids = []
             for topic_name in raw.get("topics", []):
+                matched_tid = None
+                topic_name_stripped = topic_name.strip()
+                topic_name_lower = topic_name_stripped.lower()
+                # 第一级：大小写不敏感 + strip 的字符串匹配
                 for tid in segment.topic_ids:
-                    if tid in self.topics and self.topics[tid].label == topic_name:
-                        mem_topic_ids.append(tid)
+                    if tid in self.topics and self.topics[tid].label.strip().lower() == topic_name_lower:
+                        matched_tid = tid
                         break
+                # 第二级：embedding 相似度匹配
+                if matched_tid is None and topic_name_stripped:
+                    topic_name_emb = self.emb.encode(topic_name_stripped)
+                    best_sim = 0.0
+                    best_tid = None
+                    for tid in segment.topic_ids:
+                        if tid in self.topics and self.topics[tid].label_embedding is not None:
+                            sim = EmbeddingService.cosine_similarity(topic_name_emb, self.topics[tid].label_embedding)
+                            if sim > best_sim:
+                                best_sim = sim
+                                best_tid = tid
+                    if best_tid and best_sim >= config.TOPIC_MERGE_SIMILARITY_THRESHOLD:
+                        matched_tid = best_tid
+                if matched_tid:
+                    mem_topic_ids.append(matched_tid)
             # 如果没有成功映射任何主题，则使用段的全部主题
             if not mem_topic_ids:
                 mem_topic_ids = list(segment.topic_ids)
