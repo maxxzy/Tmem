@@ -71,6 +71,7 @@ class LLMService:
         kwargs = dict(
             model=self.model,
             temperature=config.LLM_TEMPERATURE,
+            seed=config.LLM_SEED,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -79,7 +80,8 @@ class LLMService:
         if extra_params:
             kwargs.update(extra_params)
         response = self.client.chat.completions.create(**kwargs)
-        raw = response.choices[0].message.content.strip()
+        content = response.choices[0].message.content if response.choices else None
+        raw = (content or "").strip()
         stripped = self._strip_think(raw)
         if return_raw:
             return stripped, raw
@@ -131,8 +133,10 @@ class LLMService:
             "with NO extra text, NO explanation, NO markdown fences.\n\n"
             "Task: Identify 1-3 topics from a dialogue segment.\n"
             "Each element must be a JSON object with exactly these fields:\n"
-            '  - "label" (string): a concise topic label, 2-6 words\n'
-            '  - "keywords" (array of strings): 3-5 representative keywords\n\n'
+            '  - "label" (string, REQUIRED): a concise topic label, 2-6 words\n'
+            '  - "keywords" (array of strings, REQUIRED): 3-5 representative keywords\n\n'
+            "IMPORTANT: Do NOT return a plain string array like [\"topic1\", \"topic2\"]. "
+            "Each element MUST be a JSON object with \"label\" and \"keywords\" fields.\n\n"
             "Example output:\n"
             '[{"label": "Work Stress", "keywords": ["overtime", "deadline", "pressure"]}, '
             '{"label": "Family Vacation", "keywords": ["trip", "beach", "summer"]}]'
@@ -143,7 +147,16 @@ class LLMService:
         )
         try:
             result = self._chat_json(system_prompt, user_prompt)
-            return result if isinstance(result, list) else [result]
+            items = result if isinstance(result, list) else [result]
+            # 规范化：确保每个元素都是 dict
+            normalized = []
+            for item in items:
+                if isinstance(item, dict) and item.get("label"):
+                    normalized.append(item)
+                elif isinstance(item, str) and item.strip():
+                    normalized.append({"label": item.strip(), "keywords": []})
+                # 其他类型（int, None, list 等）直接跳过
+            return normalized if normalized else [{"label": "Unknown Topic", "keywords": []}]
         except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"Failed to generate topic labels: {e}")
             return [{"label": "Unknown Topic", "keywords": []}]
@@ -214,7 +227,11 @@ class LLMService:
             f'Topic: "{topic_label}"\n\nRelated memories:\n{memories_text}\n\n'
             "Generate a concise summary of this topic (1-3 sentences):"
         )
-        return self._chat(system_prompt, user_prompt)
+        try:
+            return self._chat(system_prompt, user_prompt)
+        except Exception as e:
+            logger.warning(f"Failed to generate topic summary for '{topic_label}': {e}")
+            return topic_label
 
     # ======================== 虚拟节点命名 ========================
 
@@ -226,7 +243,11 @@ class LLMService:
             f"Sub-topic list: [{labels_str}]\n\n"
             "Provide a concise parent topic name (2-4 words):"
         )
-        return self._chat(system_prompt, user_prompt).strip('"').strip("'")
+        try:
+            return self._chat(system_prompt, user_prompt).strip('"').strip("'")
+        except Exception as e:
+            logger.warning(f"Failed to name cluster {child_labels}: {e}")
+            return " & ".join(child_labels[:2])
 
     # ======================== DAG 父子关系判断 ========================
 
@@ -241,8 +262,12 @@ class LLMService:
             "a sub-topic of another (is-a or part-of relationship). Answer only yes or no."
         )
         user_prompt = f'Is "{child_label}" a sub-topic of "{parent_label}"? Answer yes or no.'
-        answer = self._chat(system_prompt, user_prompt).lower()
-        return "yes" in answer
+        try:
+            answer = self._chat(system_prompt, user_prompt).lower()
+            return "yes" in answer
+        except Exception as e:
+            logger.warning(f"Failed to judge parent-child '{child_label}' -> '{parent_label}': {e}")
+            return False
 
     # ======================== 因果/语义关系判断 ========================
 
@@ -273,7 +298,16 @@ class LLMService:
         )
         try:
             result = self._chat_json(system_prompt, user_prompt)
+            if not isinstance(result, dict):
+                return None
             if result.get("related"):
+                # 确保 score 为数值
+                score = result.get("score", 0.0)
+                if not isinstance(score, (int, float)):
+                    try:
+                        result["score"] = float(score)
+                    except (ValueError, TypeError):
+                        result["score"] = 0.5
                 return result
             return None
         except (json.JSONDecodeError, Exception) as e:

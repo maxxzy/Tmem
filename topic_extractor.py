@@ -167,6 +167,11 @@ class TopicExtractor:
 
         topic_ids = []
         for item in raw_labels:
+            # 容错：跳过非 dict/str 类型的元素
+            if isinstance(item, str):
+                item = {"label": item, "keywords": []}
+            if not isinstance(item, dict):
+                continue
             label = item.get("label", "未知主题")
             keywords = set(item.get("keywords", []))
             label_emb = self.emb.encode(label)
@@ -268,12 +273,18 @@ class TopicExtractor:
             if not mem_topic_ids:
                 mem_topic_ids = list(segment.topic_ids)
 
+                importance_raw = raw.get("importance", 0.5)
+                try:
+                    importance = float(importance_raw)
+                except (ValueError, TypeError):
+                    importance = 0.5
+
             memory = Memory(
                 content=content,
                 topic_ids=mem_topic_ids,
                 keywords=raw.get("keywords", []),
                 embedding=self.emb.encode(content),
-                importance=raw.get("importance", 0.5),
+                importance=importance,
                 source_segment_id=segment.segment_id,
             )
             memories.append(memory)

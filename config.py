@@ -25,6 +25,7 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "qwen3:30b")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "ollama"))
 LLM_TEMPERATURE = 0.3  # 较低温度以获得更稳定的结构化输出
+LLM_SEED = 42          # 固定随机种子，确保实验可复现
 
 # ======================== Neo4j 图数据库配置 ========================
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:17687")
@@ -115,7 +116,7 @@ PPR_TOP_K = 5  # 跨主题扩展取 top-K 个主题
 
 # ======================== 检索配置 ========================
 # 主题路由时，query 匹配主题的最大数量上限
-MAX_ROUTED_TOPICS = 5
+MAX_ROUTED_TOPICS = 7
 # 主题路由时，query 匹配主题的最小数量下限（不足时沿 DAG 向上扩展）
 MIN_ROUTED_TOPICS = 3
 # 主题内记忆检索的 top-K
@@ -130,9 +131,23 @@ REASONING_KEYWORDS = [
     "what caused", "what led to", "because",
     "explain", "how did",
 ]
+# 枚举/聚合型关键词，触发跨主题扩展以覆盖分散的 evidence
+ENUMERATION_KEYWORDS = [
+    "what has", "what have", "what did",
+    "how many", "how much",
+    "list", "all the", "all of",
+    "every", "each time",
+    "what are", "what were",
+    "which", "name all",
+]
 # 检索得分过低阈值，低于此值触发跨主题扩展
-LOW_SCORE_THRESHOLD = 0.3
+LOW_SCORE_THRESHOLD = 0.35
 
 # ======================== 定期重构配置 ========================
 # 每新增多少条记忆后触发全局重构
 GLOBAL_REBUILD_INTERVAL = 50
+
+# ======================== MMR 多样性重排配置 ========================
+MMR_ENABLED = True          # 是否启用 MMR 多样性重排
+MMR_LAMBDA = 0.7           # 相关性 vs 多样性权衡 (1.0 = 纯相关性排序)
+MMR_TOPIC_WEIGHT = 0.7     # 多样性信号中主题重叠的权重 (vs embedding 相似度)

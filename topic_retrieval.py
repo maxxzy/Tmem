@@ -300,8 +300,12 @@ class TopicRetriever:
         # 主题内无结果时必须扩展
         if not intra_results:
             return True
+        query_lower = query.lower()
         for kw in config.REASONING_KEYWORDS:
-            if kw in query.lower():
+            if kw in query_lower:
+                return True
+        for kw in config.ENUMERATION_KEYWORDS:
+            if kw in query_lower:
                 return True
         if intra_results:
             avg_score = sum(r.score for r in intra_results) / len(intra_results)
@@ -359,6 +363,62 @@ class TopicRetriever:
 
         results.sort(key=lambda r: r.score, reverse=True)
         return results[:config.PPR_TOP_K]
+
+    # ======================== MMR 多样性重排 ========================
+
+    def _mmr_select(
+        self, candidates: list[RetrievalResult], top_k: int
+    ) -> list[RetrievalResult]:
+        """
+        MMR (Maximal Marginal Relevance) 多样性重排
+
+        兼顾相关性和主题多样性，避免 top-k 结果集中在同一主题段。
+        """
+        if len(candidates) <= top_k:
+            return candidates
+
+        max_score = max(r.score for r in candidates)
+        if max_score <= 0:
+            return candidates[:top_k]
+
+        selected: list[int] = []
+        remaining = list(range(len(candidates)))
+
+        # 第一条：取最高分
+        best_idx = max(remaining, key=lambda i: candidates[i].score)
+        selected.append(best_idx)
+        remaining.remove(best_idx)
+
+        lam = config.MMR_LAMBDA
+        topic_w = config.MMR_TOPIC_WEIGHT
+
+        for _ in range(top_k - 1):
+            if not remaining:
+                break
+            best_mmr = -float('inf')
+            best_i = remaining[0]
+            for i in remaining:
+                relevance = candidates[i].score / max_score
+                max_redundancy = 0.0
+                topics_i = set(candidates[i].memory.topic_ids)
+                for j in selected:
+                    topics_j = set(candidates[j].memory.topic_ids)
+                    union = topics_i | topics_j
+                    topic_overlap = len(topics_i & topics_j) / len(union) if union else 0
+                    emb_sim = 0.0
+                    if candidates[i].memory.embedding is not None and candidates[j].memory.embedding is not None:
+                        emb_sim = max(0, float(np.dot(candidates[i].memory.embedding, candidates[j].memory.embedding)))
+                    redundancy = topic_w * topic_overlap + (1 - topic_w) * emb_sim
+                    if redundancy > max_redundancy:
+                        max_redundancy = redundancy
+                mmr = lam * relevance - (1 - lam) * max_redundancy
+                if mmr > best_mmr:
+                    best_mmr = mmr
+                    best_i = i
+            selected.append(best_i)
+            remaining.remove(best_i)
+
+        return [candidates[i] for i in selected]
 
     # ======================== 完整检索流程 ========================
 
@@ -421,4 +481,6 @@ class TopicRetriever:
                 logger.info(f"全局回退: 补充 {fallback_count} 条结果")
 
         all_results.sort(key=lambda r: r.score, reverse=True)
+        if config.MMR_ENABLED:
+            return self._mmr_select(all_results, top_k)
         return all_results[:top_k]
