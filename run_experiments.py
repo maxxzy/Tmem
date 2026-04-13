@@ -752,15 +752,61 @@ def run_experiment_4(
 #  实验 2/3/4 联合执行（共享样本提取，节省 LLM 调用）
 # ============================================================
 
+def _aggregate_exp2(exp2_tmem, exp2_dense):
+    """汇总 exp2 结果"""
+    def agg(per_sample):
+        all_p = [v["overall_p5"] for v in per_sample.values()]
+        all_r = [v["overall_r5"] for v in per_sample.values()]
+        if not all_p:
+            return {"overall_p5": 0.0, "overall_r5": 0.0, "per_sample": {}}
+        return {
+            "overall_p5": round(np.mean(all_p), 4),
+            "overall_r5": round(np.mean(all_r), 4),
+            "per_sample": {k: {"p5": v["overall_p5"], "r5": v["overall_r5"]} for k, v in per_sample.items()},
+        }
+    return {"tmem": agg(exp2_tmem), "dense_baseline": agg(exp2_dense)}
+
+
+def _aggregate_exp3(exp3_variant_results, variants):
+    """汇总 exp3 结果"""
+    exp3_summary = {}
+    for v in variants:
+        per_s = exp3_variant_results[v]
+        all_p = [r["overall_p5"] for r in per_s.values()]
+        all_r = [r["overall_r5"] for r in per_s.values()]
+        exp3_summary[v] = {
+            "p5": round(np.mean(all_p), 4) if all_p else 0.0,
+            "r5": round(np.mean(all_r), 4) if all_r else 0.0,
+            "per_sample": {k: {"p5": r["overall_p5"], "r5": r["overall_r5"]} for k, r in per_s.items()},
+        }
+    return {"variants": exp3_summary}
+
+
+def _aggregate_exp4(exp4_full_recalls, exp4_no_ppr_recalls, exp4_total_cross_qas):
+    """汇总 exp4 结果"""
+    full_mean = round(np.mean(exp4_full_recalls), 4) if exp4_full_recalls else 0.0
+    no_ppr_mean = round(np.mean(exp4_no_ppr_recalls), 4) if exp4_no_ppr_recalls else 0.0
+    return {
+        "num_cross_topic_qas": exp4_total_cross_qas,
+        "full": {"cross_topic_recall": full_mean},
+        "-crosstopic": {"cross_topic_recall": no_ppr_mean},
+        "ppr_contribution": round(full_mean - no_ppr_mean, 4),
+    }
+
+
 def run_combined_234(
     loader: LoCoMoLoader,
     use_neo4j: bool,
     use_qdrant: bool,
     top_k: int = 5,
     max_sessions: int | None = None,
+    output_dir: str = "results",
 ) -> tuple[dict, dict, dict]:
     """
     联合执行实验 2/3/4，每个样本只做一次 full 提取
+
+    每个样本完成 exp2 后立即增量保存，exp3/exp4 各阶段完成后也增量保存，
+    确保后续实验崩溃时不丢失已完成实验的结果。
 
     Returns:
         (exp2_result, exp3_result, exp4_result)
@@ -781,6 +827,10 @@ def run_combined_234(
     exp4_full_recalls = []
     exp4_no_ppr_recalls = []
     exp4_total_cross_qas = 0
+
+    exp2_path = os.path.join(output_dir, "exp2_locomo_evaluation.json")
+    exp3_path = os.path.join(output_dir, "exp3_ablation_study.json")
+    exp4_path = os.path.join(output_dir, "exp4_cross_topic_recall.json")
 
     for sample in loader.samples:
         sid = sample["sample_id"]
@@ -805,6 +855,9 @@ def run_combined_234(
         dense_result = evaluate_sample_retrieval(tmem_full, qas, evidence_lookup, top_k, "dense")
         exp2_dense[sid] = dense_result
         logger.info(f"  Dense P@5={dense_result['overall_p5']:.4f}  R@5={dense_result['overall_r5']:.4f}")
+
+        # 增量保存 exp2
+        save_json(_aggregate_exp2(exp2_tmem, exp2_dense), exp2_path)
 
         # ========== 3. Exp3: full (复用 exp2 结果) ==========
         exp3_variant_results["full"][sid] = tmem_result
@@ -847,6 +900,9 @@ def run_combined_234(
             exp4_no_ppr_recalls.append(compute_cross_topic_recall(no_ppr_r, cross_mids))
             retriever.should_cross_topic_expand = orig_expand
 
+        # 增量保存 exp4
+        save_json(_aggregate_exp4(exp4_full_recalls, exp4_no_ppr_recalls, exp4_total_cross_qas), exp4_path)
+
         # ========== 7. Exp3: -multilabel ==========
         logger.info(f"[Exp3 -multilabel] Cloning and applying...")
         tmem_ml = clone_tmem_state(tmem_full, use_neo4j, use_qdrant)
@@ -870,45 +926,16 @@ def run_combined_234(
         finally:
             TopicExtractor.segment_dialogue = orig_segment
 
+        # 增量保存 exp3
+        save_json(_aggregate_exp3(exp3_variant_results, variants), exp3_path)
+
         # 清理
         tmem_full.close()
 
-    # ========== 汇总 ==========
-
-    # Exp2
-    def agg(per_sample):
-        all_p = [v["overall_p5"] for v in per_sample.values()]
-        all_r = [v["overall_r5"] for v in per_sample.values()]
-        return {
-            "overall_p5": round(np.mean(all_p), 4),
-            "overall_r5": round(np.mean(all_r), 4),
-            "per_sample": {k: {"p5": v["overall_p5"], "r5": v["overall_r5"]} for k, v in per_sample.items()},
-        }
-
-    exp2_result = {"tmem": agg(exp2_tmem), "dense_baseline": agg(exp2_dense)}
-
-    # Exp3
-    exp3_summary = {}
-    for v in variants:
-        per_s = exp3_variant_results[v]
-        all_p = [r["overall_p5"] for r in per_s.values()]
-        all_r = [r["overall_r5"] for r in per_s.values()]
-        exp3_summary[v] = {
-            "p5": round(np.mean(all_p), 4) if all_p else 0.0,
-            "r5": round(np.mean(all_r), 4) if all_r else 0.0,
-            "per_sample": {k: {"p5": r["overall_p5"], "r5": r["overall_r5"]} for k, r in per_s.items()},
-        }
-    exp3_result = {"variants": exp3_summary}
-
-    # Exp4
-    full_mean = round(np.mean(exp4_full_recalls), 4) if exp4_full_recalls else 0.0
-    no_ppr_mean = round(np.mean(exp4_no_ppr_recalls), 4) if exp4_no_ppr_recalls else 0.0
-    exp4_result = {
-        "num_cross_topic_qas": exp4_total_cross_qas,
-        "full": {"cross_topic_recall": full_mean},
-        "-crosstopic": {"cross_topic_recall": no_ppr_mean},
-        "ppr_contribution": round(full_mean - no_ppr_mean, 4),
-    }
+    # ========== 最终汇总 ==========
+    exp2_result = _aggregate_exp2(exp2_tmem, exp2_dense)
+    exp3_result = _aggregate_exp3(exp3_variant_results, variants)
+    exp4_result = _aggregate_exp4(exp4_full_recalls, exp4_no_ppr_recalls, exp4_total_cross_qas)
 
     return exp2_result, exp3_result, exp4_result
 
@@ -974,6 +1001,7 @@ def main():
         t0 = time.time()
         exp2_result, exp3_result, exp4_result = run_combined_234(
             loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions,
+            output_dir=out_dir,
         )
         combined_time = time.time() - t0
 

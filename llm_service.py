@@ -34,9 +34,9 @@ class LLMService:
         import re
         return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
-    def _chat(self, system_prompt: str, user_prompt: str) -> str:
+    def _chat(self, system_prompt: str, user_prompt: str, extra_params: dict | None = None) -> str:
         """基础聊天调用，返回模型文本响应"""
-        response = self.client.chat.completions.create(
+        kwargs = dict(
             model=self.model,
             temperature=config.LLM_TEMPERATURE,
             messages=[
@@ -44,12 +44,17 @@ class LLMService:
                 {"role": "user", "content": user_prompt},
             ],
         )
+        if extra_params:
+            kwargs.update(extra_params)
+        response = self.client.chat.completions.create(**kwargs)
         raw = response.choices[0].message.content.strip()
         return self._strip_think(raw)
 
-    def _chat_json(self, system_prompt: str, user_prompt: str) -> dict | list:
+    def _chat_json(self, system_prompt: str, user_prompt: str, extra_params: dict | None = None) -> dict | list:
         """调用 LLM 并解析 JSON 响应"""
-        raw = self._chat(system_prompt, user_prompt)
+        raw = self._chat(system_prompt, user_prompt, extra_params)
+        if not raw:
+            raise json.JSONDecodeError("Empty response after stripping think block", "", 0)
         # 尝试提取 JSON 块（LLM 可能包裹在 ```json ... ``` 中）
         if "```json" in raw:
             raw = raw.split("```json")[1].split("```")[0]
@@ -97,7 +102,8 @@ class LLMService:
             "Each memory should be a complete, self-contained declarative statement. "
             "Extract as many distinct memories as possible — do not merge multiple facts into one. "
             "Each memory must be tagged with relevant topics (select from the given topic set, multiple allowed), "
-            "keywords, and an importance score (0-1)."
+            "keywords, and an importance score (0-1). "
+            "Reply ONLY with a JSON array, no explanation."
         )
         user_prompt = (
             f"Dialogue:\n{segment_text}\n\n"
@@ -110,8 +116,13 @@ class LLMService:
             result = self._chat_json(system_prompt, user_prompt)
             return result if isinstance(result, list) else [result]
         except (json.JSONDecodeError, Exception) as e:
-            logger.warning(f"Failed to extract memories: {e}")
-            return []
+            logger.warning(f"Failed to extract memories (attempt 1): {e}, retrying...")
+            try:
+                result = self._chat_json(system_prompt, user_prompt)
+                return result if isinstance(result, list) else [result]
+            except (json.JSONDecodeError, Exception) as e2:
+                logger.warning(f"Failed to extract memories (attempt 2): {e2}")
+                return []
 
     # ======================== 主题摘要生成 ========================
 
