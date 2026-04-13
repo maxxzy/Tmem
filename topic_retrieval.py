@@ -97,6 +97,12 @@ class TopicRetriever:
                 matched = sum(1 for kw in topic.keywords if kw.lower() in query_lower)
                 score_map[tid] += 0.25 * (matched / len(topic.keywords))
 
+        # 过滤掉没有记忆的空主题（路由到空主题毫无意义）
+        score_map = {
+            tid: s for tid, s in score_map.items()
+            if self.topics[tid].memory_ids
+        }
+
         result = sorted(score_map.items(), key=lambda x: x[1], reverse=True)
         return result
 
@@ -107,6 +113,9 @@ class TopicRetriever:
         scored_topics = []
         for tid, topic in self.topics.items():
             if topic.is_virtual or tid == ROOT_TOPIC_ID:
+                continue
+            # 跳过没有记忆的空主题
+            if not topic.memory_ids:
                 continue
 
             score = 0.0
@@ -288,6 +297,9 @@ class TopicRetriever:
         self, query: str, intra_results: list[RetrievalResult]
     ) -> bool:
         """判断是否需要跨主题扩展"""
+        # 主题内无结果时必须扩展
+        if not intra_results:
+            return True
         for kw in config.REASONING_KEYWORDS:
             if kw in query.lower():
                 return True
@@ -354,7 +366,7 @@ class TopicRetriever:
         """
         主题路由的完整记忆检索流程
 
-        1. 主题路由 → 2. DAG 调整 → 3. 主题内检索 → 4. 跨主题扩展
+        1. 主题路由 → 2. DAG 调整 → 3. 主题内检索 → 4. 跨主题扩展 → 5. 全局回退
         """
         query_emb = self.emb.encode(query)
 
@@ -375,12 +387,38 @@ class TopicRetriever:
         # 4. 跨主题扩展
         all_results = list(intra_results)
         seed_ids = [tid for tid, _ in adjusted_topics]
+        cross_count = 0
 
         if self.should_cross_topic_expand(query, intra_results):
             existing_ids = {r.memory.memory_id for r in intra_results}
             cross_results = self.retrieve_cross_topic(query_emb, seed_ids, existing_ids)
             all_results.extend(cross_results)
-            logger.info(f"跨主题扩展: {len(cross_results)} 条结果")
+            cross_count = len(cross_results)
+            logger.info(f"跨主题扩展: {cross_count} 条结果")
+
+        # 5. 全局回退：主题路由结果不足时，无主题过滤直接向量检索
+        if len(all_results) < top_k and self.qdrant is not None:
+            existing_ids = {r.memory.memory_id for r in all_results}
+            fallback_hits = self.qdrant.search_memories(
+                query_embedding=query_emb,
+                top_k=top_k,
+                topic_ids=None,  # 不过滤主题
+            )
+            fallback_count = 0
+            for hit in fallback_hits:
+                mid = hit["memory_id"]
+                if mid in existing_ids:
+                    continue
+                mem = self.memories.get(mid)
+                if not mem:
+                    continue
+                score = hit["score"] * 0.8  # 全局回退折扣
+                all_results.append(RetrievalResult(
+                    memory=mem, score=score, source_type="fallback", matched_topics=[],
+                ))
+                fallback_count += 1
+            if fallback_count:
+                logger.info(f"全局回退: 补充 {fallback_count} 条结果")
 
         all_results.sort(key=lambda r: r.score, reverse=True)
         return all_results[:top_k]

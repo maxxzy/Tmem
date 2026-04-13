@@ -220,6 +220,16 @@ class TopicExtractor:
         # LLM 抽取记忆
         raw_memories = self.llm.extract_memories(text, topic_labels)
 
+        if not raw_memories:
+            logger.warning(f"主题段 {segment.segment_id[:8]}: LLM 返回空记忆列表")
+        else:
+            valid_count = sum(1 for r in raw_memories if isinstance(r, dict) and r.get("content"))
+            if valid_count == 0:
+                logger.warning(
+                    f"主题段 {segment.segment_id[:8]}: LLM 返回 {len(raw_memories)} 条记录但均无有效 content, "
+                    f"样例: {raw_memories[0] if raw_memories else 'N/A'}"
+                )
+
         memories = []
         for raw in raw_memories:
             if not isinstance(raw, dict):

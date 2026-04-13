@@ -37,11 +37,12 @@ class LLMService:
     @staticmethod
     def _extract_json_from_text(text: str) -> dict | list:
         """
-        在文本中搜索第一个有效的 JSON 数组或对象。
-        使用 json.JSONDecoder.raw_decode 进行正确的括号匹配。
-        优先查找数组 [...]，其次查找对象 {...}。
+        在文本中搜索最佳的 JSON 数组或对象。
+        优先返回 dict 或包含 dict 的数组（结构化输出），
+        跳过纯基本类型数组（如 ["keyword1", ...]，通常是 think 块中的片段）。
         """
         decoder = json.JSONDecoder()
+        first_found = None
         for start_char in ("[", "{"):
             search_from = 0
             while search_from < len(text):
@@ -49,10 +50,20 @@ class LLMService:
                 if pos == -1:
                     break
                 try:
-                    result, _ = decoder.raw_decode(text, pos)
-                    return result
+                    result, end_idx = decoder.raw_decode(text, pos)
+                    # 优先返回 dict 或数组中包含 dict 的结构化结果
+                    if isinstance(result, dict):
+                        return result
+                    if isinstance(result, list) and result and isinstance(result[0], dict):
+                        return result
+                    # 记住第一个有效 JSON 作为最终回退
+                    if first_found is None:
+                        first_found = result
+                    search_from = end_idx
                 except json.JSONDecodeError:
                     search_from = pos + 1
+        if first_found is not None:
+            return first_found
         raise json.JSONDecodeError("No valid JSON found in text", text[:200], 0)
 
     def _chat(self, system_prompt: str, user_prompt: str, extra_params: dict | None = None, *, return_raw: bool = False):
@@ -116,13 +127,19 @@ class LLMService:
         返回格式: [{"label": "Work Stress", "keywords": ["overtime", "deadline"]}, ...]
         """
         system_prompt = (
-            "You are a topic analysis assistant. Identify 1-3 topics from the given dialogue segment. "
-            "For each topic, generate a concise topic label (a 2-6 word phrase) and 3-5 keywords. "
-            "Return the result as a JSON array."
+            "You are a topic analysis assistant. Your ONLY output must be a valid JSON array, "
+            "with NO extra text, NO explanation, NO markdown fences.\n\n"
+            "Task: Identify 1-3 topics from a dialogue segment.\n"
+            "Each element must be a JSON object with exactly these fields:\n"
+            '  - "label" (string): a concise topic label, 2-6 words\n'
+            '  - "keywords" (array of strings): 3-5 representative keywords\n\n'
+            "Example output:\n"
+            '[{"label": "Work Stress", "keywords": ["overtime", "deadline", "pressure"]}, '
+            '{"label": "Family Vacation", "keywords": ["trip", "beach", "summer"]}]'
         )
         user_prompt = (
-            f"Analyze the topics in the following dialogue segment:\n\n{segment_text}\n\n"
-            'Return JSON format: [{"label": "topic label", "keywords": ["keyword1", "keyword2", ...]}]'
+            f"Dialogue segment:\n\n{segment_text}\n\n"
+            "Output the JSON array now:"
         )
         try:
             result = self._chat_json(system_prompt, user_prompt)
@@ -143,32 +160,44 @@ class LLMService:
         """
         topics_str = ", ".join(f'"{t}"' for t in topic_labels)
         system_prompt = (
-            "You are a memory extraction assistant. Extract ALL key factual memories from the dialogue. "
-            "Include personal facts, events, preferences, plans, opinions, and relationships mentioned. "
-            "Each memory should be a complete, self-contained declarative statement. "
-            "Extract as many distinct memories as possible — do not merge multiple facts into one. "
-            "Each memory must be tagged with relevant topics (select from the given topic set, multiple allowed), "
-            "keywords, and an importance score (0-1). "
-            "Reply ONLY with a JSON array, no explanation."
+            "You are a memory extraction assistant. Your ONLY output must be a valid JSON array, "
+            "with NO extra text, NO explanation, NO markdown fences.\n\n"
+            "Task: Extract ALL key factual memories from a dialogue. "
+            "Include personal facts, events, preferences, plans, opinions, and relationships. "
+            "Each memory must be a complete, self-contained declarative statement. "
+            "Extract as many distinct memories as possible — do not merge multiple facts into one.\n\n"
+            "Each element must be a JSON object with exactly these fields:\n"
+            '  - "content" (string, REQUIRED): the memory statement\n'
+            '  - "topics" (array of strings): select from the provided topic labels only\n'
+            '  - "keywords" (array of strings): 2-5 keywords for this memory\n'
+            '  - "importance" (number): 0.0 to 1.0\n\n'
+            "Example output:\n"
+            '[{"content": "Alice plans to visit Paris in July", "topics": ["Travel Plans"], '
+            '"keywords": ["Paris", "July", "travel"], "importance": 0.7}, '
+            '{"content": "Bob prefers Italian food", "topics": ["Food Preferences"], '
+            '"keywords": ["Italian", "food", "preference"], "importance": 0.5}]'
         )
         user_prompt = (
             f"Dialogue:\n{segment_text}\n\n"
             f"Available topic labels: [{topics_str}]\n\n"
-            "Extract ALL factual memories from this dialogue. Return as a JSON array:\n"
-            '[{"content": "memory content", "topics": ["topic1", "topic2"], '
-            '"keywords": ["keyword1"], "importance": 0.7}]'
+            "Output the JSON array now:"
         )
-        try:
-            result = self._chat_json(system_prompt, user_prompt)
-            return result if isinstance(result, list) else [result]
-        except (json.JSONDecodeError, Exception) as e:
-            logger.warning(f"Failed to extract memories (attempt 1): {e}, retrying...")
+        max_attempts = 3
+        for attempt in range(1, max_attempts + 1):
             try:
                 result = self._chat_json(system_prompt, user_prompt)
-                return result if isinstance(result, list) else [result]
-            except (json.JSONDecodeError, Exception) as e2:
-                logger.warning(f"Failed to extract memories (attempt 2): {e2}")
-                return []
+                memories = result if isinstance(result, list) else [result]
+                # 验证结构：至少有一条包含 content 的 dict 才算成功
+                if any(isinstance(m, dict) and m.get("content") for m in memories):
+                    return memories
+                logger.warning(
+                    f"记忆抽取第 {attempt} 次返回格式异常（非 dict 数组），"
+                    f"样例: {memories[0] if memories else 'empty'}"
+                )
+            except (json.JSONDecodeError, Exception) as e:
+                logger.warning(f"记忆抽取第 {attempt} 次失败: {e}")
+        logger.warning(f"记忆抽取 {max_attempts} 次均失败，返回空列表")
+        return []
 
     # ======================== 主题摘要生成 ========================
 
@@ -226,15 +255,21 @@ class LLMService:
                或 None（无关联）
         """
         system_prompt = (
-            "You are a relationship analysis assistant. Determine whether two topics are associated.\n"
-            "Association types include: causal, conditional, complementary.\n"
-            "Return the result in JSON format."
+            "You are a relationship analysis assistant. Your ONLY output must be a valid JSON object, "
+            "with NO extra text, NO explanation, NO markdown fences.\n\n"
+            "Task: Determine whether two topics are associated.\n"
+            "Association types: causal, conditional, complementary.\n\n"
+            "Output must be a JSON object with exactly these fields:\n"
+            '  - "related" (boolean): true if associated, false otherwise\n'
+            '  - "type" (string): "causal", "conditional", or "complementary"\n'
+            '  - "score" (number): 0.0 to 1.0, strength of association\n'
+            '  - "direction" (string): "a->b", "b->a", or "both"\n\n'
+            "Example output:\n"
+            '{"related": true, "type": "causal", "score": 0.7, "direction": "a->b"}'
         )
         user_prompt = (
             f'Topic A: "{topic_a}"\nTopic B: "{topic_b}"\n\n'
-            "Determine the relationship between them and return JSON:\n"
-            '{"related": true/false, "type": "causal/conditional/complementary", '
-            '"score": 0.0-1.0, "direction": "a->b" or "b->a" or "both"}'
+            "Output the JSON object now:"
         )
         try:
             result = self._chat_json(system_prompt, user_prompt)

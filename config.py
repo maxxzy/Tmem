@@ -117,7 +117,7 @@ PPR_TOP_K = 5  # 跨主题扩展取 top-K 个主题
 # 主题路由时，query 匹配主题的最大数量上限
 MAX_ROUTED_TOPICS = 5
 # 主题路由时，query 匹配主题的最小数量下限（不足时沿 DAG 向上扩展）
-MIN_ROUTED_TOPICS = 1
+MIN_ROUTED_TOPICS = 3
 # 主题内记忆检索的 top-K
 INTRA_TOPIC_TOP_K = 10
 # 跨主题扩展的记忆权重折扣因子
