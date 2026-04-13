@@ -108,13 +108,14 @@ class LoCoMoLoader:
         )
         return all_sessions
 
-    def get_qa_pairs(self, sample: dict, categories: list[int] | None = None) -> list[dict]:
+    def get_qa_pairs(self, sample: dict, categories: list[int] | None = None, max_sessions: int | None = None) -> list[dict]:
         """
         获取样本的 QA 评测对
 
         Args:
             sample: LoCoMo 样本
             categories: 筛选的 QA 类别（1-5），None 表示全部
+            max_sessions: 只保留 evidence 全部在前 N 个 session 内的 QA（None 表示全部）
 
         Returns:
             [{"question": str, "answer": str, "evidence": [dia_id, ...], "category": int}, ...]
@@ -125,6 +126,23 @@ class LoCoMoLoader:
 
         result = []
         for qa in qas:
+            # 根据 max_sessions 过滤：evidence 中所有 dia_id 的 session 编号都须 <= max_sessions
+            if max_sessions is not None:
+                evidence = qa.get("evidence", [])
+                if evidence:
+                    skip = False
+                    for dia_id in evidence:
+                        # dia_id 格式: "D{session}:{turn}"
+                        try:
+                            session_num = int(dia_id.split(":")[0][1:])
+                            if session_num > max_sessions:
+                                skip = True
+                                break
+                        except (ValueError, IndexError):
+                            pass
+                    if skip:
+                        continue
+
             entry = {
                 "question": qa.get("question", ""),
                 "evidence": qa.get("evidence", []),

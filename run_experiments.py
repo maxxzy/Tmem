@@ -413,7 +413,7 @@ def run_experiment_2(
         # 灌入数据
         tmem = ingest_sample(sample, loader, use_neo4j, use_qdrant, max_sessions)
         evidence_lookup = build_evidence_lookup(sample)
-        qas = loader.get_qa_pairs(sample)
+        qas = loader.get_qa_pairs(sample, max_sessions=max_sessions)
         logger.info(f"Evaluating {len(qas)} QA pairs...")
 
         # TMem 评测
@@ -513,7 +513,7 @@ def run_experiment_3(
         logger.info(f"\n--- Sample: {sid} ---")
 
         evidence_lookup = build_evidence_lookup(sample)
-        qas = loader.get_qa_pairs(sample)
+        qas = loader.get_qa_pairs(sample, max_sessions=max_sessions)
 
         # === full: 完整 TMem ===
         logger.info(f"  [full] Ingesting...")
@@ -698,7 +698,7 @@ def run_experiment_4(
 
         tmem = ingest_sample(sample, loader, use_neo4j, use_qdrant, max_sessions)
         evidence_lookup = build_evidence_lookup(sample)
-        qas = loader.get_qa_pairs(sample)
+        qas = loader.get_qa_pairs(sample, max_sessions=max_sessions)
 
         # 识别跨主题 QA
         cross_qas = identify_cross_topic_qas(tmem, qas, evidence_lookup)
@@ -839,7 +839,7 @@ def run_combined_234(
         logger.info(f"{'=' * 50}")
 
         evidence_lookup = build_evidence_lookup(sample)
-        qas = loader.get_qa_pairs(sample)
+        qas = loader.get_qa_pairs(sample, max_sessions=max_sessions)
 
         # ========== 1. Full extraction (共享) ==========
         logger.info(f"[full] Ingesting...")
