@@ -183,9 +183,12 @@ class LLMService:
             '  - "topics" (array of strings): select from the provided topic labels only\n'
             '  - "keywords" (array of strings): 2-5 keywords for this memory\n'
             '  - "importance" (number): 0.0 to 1.0\n\n'
+            "IMPORTANT: A memory can belong to multiple topics if it relates to more than one. "
+            "Assign ALL relevant topics from the provided list.\n\n"
             "Example output:\n"
-            '[{"content": "Alice plans to visit Paris in July", "topics": ["Travel Plans"], '
-            '"keywords": ["Paris", "July", "travel"], "importance": 0.7}, '
+            '[{"content": "Alice plans to visit Paris in July for a job interview", '
+            '"topics": ["Travel Plans", "Career Goals"], '
+            '"keywords": ["Paris", "July", "interview"], "importance": 0.8}, '
             '{"content": "Bob prefers Italian food", "topics": ["Food Preferences"], '
             '"keywords": ["Italian", "food", "preference"], "importance": 0.5}]'
         )

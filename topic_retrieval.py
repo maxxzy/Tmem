@@ -241,7 +241,7 @@ class TopicRetriever:
             )
 
             importance = hit["payload"].get("importance", 0.5)
-            score = 0.6 * vec_sim + 0.15 * best_topic_score + keyword_bonus + 0.05 * importance
+            score = 0.75 * vec_sim + 0.10 * best_topic_score + keyword_bonus + 0.05 * importance
 
             matched_ts = [t for t in mem_topics if t in topic_score_map]
             results.append(RetrievalResult(
@@ -283,7 +283,7 @@ class TopicRetriever:
                     matched = sum(1 for kw in mem.keywords if kw.lower() in query_lower)
                     keyword_bonus = 0.1 * (matched / max(len(mem.keywords), 1))
 
-                score = 0.6 * vec_sim + 0.15 * topic_score + keyword_bonus + 0.05 * mem.importance
+                score = 0.75 * vec_sim + 0.10 * topic_score + keyword_bonus + 0.05 * mem.importance
                 results.append(RetrievalResult(
                     memory=mem, score=score, source_type="intra", matched_topics=[tid],
                 ))
@@ -426,7 +426,7 @@ class TopicRetriever:
         """
         主题路由的完整记忆检索流程
 
-        1. 主题路由 → 2. DAG 调整 → 3. 主题内检索 → 4. 跨主题扩展 → 5. 全局回退
+        1. 主题路由 → 2. DAG 调整 → 3. 主题内检索 → 4. 全局 Dense 融合 → 5. 跨主题扩展
         """
         query_emb = self.emb.encode(query)
 
@@ -444,41 +444,42 @@ class TopicRetriever:
         intra_results = self.retrieve_intra_topic(query, query_emb, adjusted_topics)
         logger.info(f"主题内检索: {len(intra_results)} 条结果")
 
-        # 4. 跨主题扩展
+        # 4. 全局 Dense 融合（始终执行，作为主题路由的安全网）
         all_results = list(intra_results)
-        seed_ids = [tid for tid, _ in adjusted_topics]
-        cross_count = 0
+        existing_ids = {r.memory.memory_id for r in all_results}
 
-        if self.should_cross_topic_expand(query, intra_results):
-            existing_ids = {r.memory.memory_id for r in intra_results}
-            cross_results = self.retrieve_cross_topic(query_emb, seed_ids, existing_ids)
-            all_results.extend(cross_results)
-            cross_count = len(cross_results)
-            logger.info(f"跨主题扩展: {cross_count} 条结果")
-
-        # 5. 全局回退：主题路由结果不足时，无主题过滤直接向量检索
-        if len(all_results) < top_k and self.qdrant is not None:
-            existing_ids = {r.memory.memory_id for r in all_results}
-            fallback_hits = self.qdrant.search_memories(
+        if self.qdrant is not None:
+            global_hits = self.qdrant.search_memories(
                 query_embedding=query_emb,
                 top_k=top_k,
                 topic_ids=None,  # 不过滤主题
             )
-            fallback_count = 0
-            for hit in fallback_hits:
+            global_count = 0
+            for hit in global_hits:
                 mid = hit["memory_id"]
                 if mid in existing_ids:
                     continue
                 mem = self.memories.get(mid)
                 if not mem:
                     continue
-                score = hit["score"] * 0.8  # 全局回退折扣
+                score = hit["score"] * config.GLOBAL_DENSE_WEIGHT
                 all_results.append(RetrievalResult(
-                    memory=mem, score=score, source_type="fallback", matched_topics=[],
+                    memory=mem, score=score, source_type="global_dense", matched_topics=[],
                 ))
-                fallback_count += 1
-            if fallback_count:
-                logger.info(f"全局回退: 补充 {fallback_count} 条结果")
+                existing_ids.add(mid)
+                global_count += 1
+            if global_count:
+                logger.info(f"全局 Dense 融合: 补充 {global_count} 条结果")
+
+        # 5. 跨主题扩展
+        seed_ids = [tid for tid, _ in adjusted_topics]
+        cross_count = 0
+
+        if self.should_cross_topic_expand(query, intra_results):
+            cross_results = self.retrieve_cross_topic(query_emb, seed_ids, existing_ids)
+            all_results.extend(cross_results)
+            cross_count = len(cross_results)
+            logger.info(f"跨主题扩展: {cross_count} 条结果")
 
         all_results.sort(key=lambda r: r.score, reverse=True)
         if config.MMR_ENABLED:

@@ -53,7 +53,7 @@ TRANSITION_WORDS = [
     "So", "Well", "Oh", "Let me change the subject",
 ]
 # 新主题标签与已有主题匹配的相似度阈值，超过则归入已有主题
-TOPIC_MERGE_SIMILARITY_THRESHOLD = 0.75
+TOPIC_MERGE_SIMILARITY_THRESHOLD = 0.65
 
 # ======================== 主题 DAG 配置 ========================
 # 主题综合相似度的权重系数 (标签嵌入, 摘要嵌入, 关键词Jaccard)
@@ -82,7 +82,7 @@ TOPIC_MERGE_MIN_MEMORY_COUNT = 10
 # ======================== 主题关联图配置 ========================
 # 共现建边条件
 NPMI_THRESHOLD = 0.1  # tau_co，NPMI 超过此阈值才建边
-MIN_COOCCURRENCE = 2  # n_min，最少共现次数
+MIN_COOCCURRENCE = 1  # n_min，最少共现次数
 
 # LLM 因果判断的候选对筛选区间（向量相似度）
 LLM_CAUSAL_SIM_LOW = 0.3
@@ -91,13 +91,13 @@ LLM_CAUSAL_SIM_HIGH = 0.6
 MAX_CAUSAL_LLM_CALLS = 30
 
 # 边权重的来源可信度权重 (共现NPMI, LLM评分, 时序NPMI)
-EDGE_WEIGHT_SOURCES = (0.5, 0.3, 0.2)  # w1, w2, w3
+EDGE_WEIGHT_SOURCES = (0.4, 0.4, 0.2)  # w1, w2, w3
 
 # 边方向判定的对称性阈值
 DIRECTION_EPSILON = 0.05
 
 # 图剪枝参数
-EDGE_WEIGHT_PRUNE_THRESHOLD = 0.15  # tau_w
+EDGE_WEIGHT_PRUNE_THRESHOLD = 0.08  # tau_w
 MAX_OUT_DEGREE = 5  # 每个节点最多保留的出边数量 K
 
 # 半衰期（天），衰减到一半权重所需的时间
@@ -122,6 +122,8 @@ MIN_ROUTED_TOPICS = 3
 INTRA_TOPIC_TOP_K = 10
 # 跨主题扩展的记忆权重折扣因子
 CROSS_TOPIC_WEIGHT_DISCOUNT = 0.7
+# 全局 Dense 融合权重折扣因子（始终执行全局检索作为安全网）
+GLOBAL_DENSE_WEIGHT = 0.9
 # 证据匹配 embedding 相似度阈值（用于评测时判断检索结果是否命中 evidence）
 EVIDENCE_MATCH_SIM_THRESHOLD = 0.6
 # 推理关键词，出现时触发跨主题扩展
@@ -147,6 +149,6 @@ LOW_SCORE_THRESHOLD = 0.35
 GLOBAL_REBUILD_INTERVAL = 50
 
 # ======================== MMR 多样性重排配置 ========================
-MMR_ENABLED = True          # 是否启用 MMR 多样性重排
+MMR_ENABLED = False         # 是否启用 MMR 多样性重排（当前关闭以优先保证召回率）
 MMR_LAMBDA = 0.7           # 相关性 vs 多样性权衡 (1.0 = 纯相关性排序)
 MMR_TOPIC_WEIGHT = 0.7     # 多样性信号中主题重叠的权重 (vs embedding 相似度)

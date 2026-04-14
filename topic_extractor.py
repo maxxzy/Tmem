@@ -131,19 +131,48 @@ class TopicExtractor:
             lines.append(f"{role}: {turn.content}")
         return "\n".join(lines)
 
-    def _match_existing_topic(self, label: str, label_emb: np.ndarray) -> str | None:
+    def _match_existing_topic(
+        self, label: str, label_emb: np.ndarray, keywords: set[str] | None = None,
+    ) -> str | None:
         """
-        将新生成的主题标签与已有主题比较
-        若相似度超过阈值，归入已有主题并返回其 id；否则返回 None
+        将新生成的主题标签与已有主题比较（多信号融合）
+
+        综合相似度 = α1·cos(label_emb) + α2·cos(summary_emb) + α3·Jaccard(keywords)
+        当 summary 不可用时，其权重转移给 label embedding。
+        若最高相似度超过阈值，归入已有主题并返回其 id；否则返回 None。
         """
+        a1, a2, a3 = config.TOPIC_SIM_WEIGHTS
+        if keywords is None:
+            keywords = set()
+
         best_sim = 0.0
         best_topic_id = None
         for tid, topic in self.topics.items():
-            if topic.label_embedding is not None:
-                sim = EmbeddingService.cosine_similarity(label_emb, topic.label_embedding)
-                if sim > best_sim:
-                    best_sim = sim
-                    best_topic_id = tid
+            if topic.label_embedding is None:
+                continue
+            sim = 0.0
+
+            # 标签嵌入相似度
+            label_sim = EmbeddingService.cosine_similarity(label_emb, topic.label_embedding)
+            sim += a1 * label_sim
+
+            # 摘要嵌入相似度（新标签无摘要，权重转移给 label）
+            if topic.summary_embedding is not None:
+                summary_sim = EmbeddingService.cosine_similarity(label_emb, topic.summary_embedding)
+                sim += a2 * summary_sim
+            else:
+                sim += a2 * label_sim
+
+            # 关键词 Jaccard
+            if keywords or topic.keywords:
+                intersection = keywords & topic.keywords
+                union = keywords | topic.keywords
+                jaccard = len(intersection) / len(union) if union else 0.0
+                sim += a3 * jaccard
+
+            if sim > best_sim:
+                best_sim = sim
+                best_topic_id = tid
 
         if best_sim >= config.TOPIC_MERGE_SIMILARITY_THRESHOLD:
             logger.debug(f"主题 '{label}' 归入已有主题 '{self.topics[best_topic_id].label}' (sim={best_sim:.3f})")
@@ -177,7 +206,7 @@ class TopicExtractor:
             label_emb = self.emb.encode(label)
 
             # 尝试归入已有主题
-            matched_id = self._match_existing_topic(label, label_emb)
+            matched_id = self._match_existing_topic(label, label_emb, keywords)
             if matched_id:
                 # 已有主题：合并关键词
                 self.topics[matched_id].keywords |= keywords
