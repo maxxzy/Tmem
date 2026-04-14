@@ -197,6 +197,7 @@ def ingest_sample(
     创建 TMem 实例，灌入一个样本的全部对话，构建索引
     """
     tmem = TMem(use_neo4j=use_neo4j, use_qdrant=use_qdrant)
+    tmem.clear_all_data()  # 清空上一个 sample 的残留数据
     sessions = loader.get_conversation_turns(sample, max_sessions=max_sessions)
 
     total = 0
@@ -327,6 +328,7 @@ def run_experiment_1(use_neo4j: bool, use_qdrant: bool) -> dict:
     # 1. 构造对话并灌入 TMem
     turns = build_constructed_dialogue()
     tmem = TMem(use_neo4j=use_neo4j, use_qdrant=use_qdrant)
+    tmem.clear_all_data()  # 清空上一个 sample 的残留数据
     tmem.add_dialogue(turns)
     tmem.build_index()
 
