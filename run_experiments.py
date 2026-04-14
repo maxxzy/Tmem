@@ -417,6 +417,7 @@ def run_experiment_2(
     use_qdrant: bool,
     top_k: int = 5,
     max_sessions: int | None = None,
+    output_dir: str = "experiment_results",
 ) -> dict:
     """实验二：LoCoMo P@5 / R@5 评测"""
     logger.info("=" * 60)
@@ -425,6 +426,7 @@ def run_experiment_2(
 
     tmem_per_sample = {}
     dense_per_sample = {}
+    exp2_path = os.path.join(output_dir, "exp2_locomo_evaluation.json")
 
     for sample in loader.samples:
         sid = sample["sample_id"]
@@ -450,31 +452,11 @@ def run_experiment_2(
 
         tmem.close()
 
-    # 汇总
-    def aggregate(per_sample):
-        all_p = [v["overall_p5"] for v in per_sample.values()]
-        all_r = [v["overall_r5"] for v in per_sample.values()]
-        cat_p, cat_r, cat_n = {}, {}, {}
-        for v in per_sample.values():
-            for cat, cm in v.get("per_category", {}).items():
-                cat_p.setdefault(cat, []).append(cm["p5"])
-                cat_r.setdefault(cat, []).append(cm["r5"])
-                cat_n[cat] = cat_n.get(cat, 0) + cm.get("count", 0)
-        per_category = {
-            cat: {"p5": round(np.mean(cat_p[cat]), 4), "r5": round(np.mean(cat_r[cat]), 4), "count": cat_n[cat]}
-            for cat in cat_p
-        }
-        return {
-            "overall_p5": round(np.mean(all_p), 4),
-            "overall_r5": round(np.mean(all_r), 4),
-            "per_sample": {k: {"p5": v["overall_p5"], "r5": v["overall_r5"]} for k, v in per_sample.items()},
-            "per_category": per_category,
-        }
+        # 增量保存
+        save_json(_aggregate_exp2(tmem_per_sample, dense_per_sample), exp2_path)
+        logger.info(f"  结果已保存至 {exp2_path}")
 
-    return {
-        "tmem": aggregate(tmem_per_sample),
-        "dense_baseline": aggregate(dense_per_sample),
-    }
+    return _aggregate_exp2(tmem_per_sample, dense_per_sample)
 
 
 # ============================================================
@@ -532,6 +514,7 @@ def run_experiment_3(
     use_qdrant: bool,
     top_k: int = 5,
     max_sessions: int | None = None,
+    output_dir: str = "experiment_results",
 ) -> dict:
     """实验三：消融实验"""
     logger.info("=" * 60)
@@ -540,6 +523,7 @@ def run_experiment_3(
 
     variants = ["full", "-boundary", "-multilabel", "-dag", "-crosstopic"]
     variant_results = {v: {} for v in variants}
+    exp3_path = os.path.join(output_dir, "exp3_ablation_study.json")
 
     for sample in loader.samples:
         sid = sample["sample_id"]
@@ -601,19 +585,11 @@ def run_experiment_3(
 
         tmem_full.close()
 
-    # 汇总
-    summary = {}
-    for v in variants:
-        per_s = variant_results[v]
-        all_p = [r["overall_p5"] for r in per_s.values()]
-        all_r = [r["overall_r5"] for r in per_s.values()]
-        summary[v] = {
-            "p5": round(np.mean(all_p), 4) if all_p else 0.0,
-            "r5": round(np.mean(all_r), 4) if all_r else 0.0,
-            "per_sample": {k: {"p5": r["overall_p5"], "r5": r["overall_r5"]} for k, r in per_s.items()},
-        }
+        # 增量保存
+        save_json(_aggregate_exp3(variant_results, variants), exp3_path)
+        logger.info(f"  结果已保存至 {exp3_path}")
 
-    return {"variants": summary}
+    return _aggregate_exp3(variant_results, variants)
 
 
 # ============================================================
@@ -715,6 +691,7 @@ def run_experiment_4(
     use_qdrant: bool,
     top_k: int = 5,
     max_sessions: int | None = None,
+    output_dir: str = "experiment_results",
 ) -> dict:
     """实验四：跨主题召回对比（full vs -crosstopic）"""
     logger.info("=" * 60)
@@ -724,6 +701,7 @@ def run_experiment_4(
     full_recalls = []
     no_ppr_recalls = []
     total_cross_qas = 0
+    exp4_path = os.path.join(output_dir, "exp4_cross_topic_recall.json")
 
     for sample in loader.samples:
         sid = sample["sample_id"]
@@ -762,6 +740,10 @@ def run_experiment_4(
             retriever.should_cross_topic_expand = orig
 
         tmem.close()
+
+        # 增量保存
+        save_json(_aggregate_exp4(full_recalls, no_ppr_recalls, total_cross_qas), exp4_path)
+        logger.info(f"  结果已保存至 {exp4_path}")
 
     full_mean = round(np.mean(full_recalls), 4) if full_recalls else 0.0
     no_ppr_mean = round(np.mean(no_ppr_recalls), 4) if no_ppr_recalls else 0.0
@@ -1073,7 +1055,7 @@ def main():
 
     elif exp == "2":
         t0 = time.time()
-        exp2_result = run_experiment_2(loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions)
+        exp2_result = run_experiment_2(loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions, output_dir=out_dir)
         save_json(exp2_result, os.path.join(out_dir, "exp2_locomo_evaluation.json"))
         summary["experiment_2"] = {
             "tmem": {
@@ -1091,14 +1073,14 @@ def main():
 
     elif exp == "3":
         t0 = time.time()
-        exp3_result = run_experiment_3(loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions)
+        exp3_result = run_experiment_3(loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions, output_dir=out_dir)
         save_json(exp3_result, os.path.join(out_dir, "exp3_ablation_study.json"))
         summary["experiment_3"] = {v: {"p5": d["p5"], "r5": d["r5"]} for v, d in exp3_result["variants"].items()}
         summary["runtime_seconds"] = round(time.time() - t0, 1)
 
     elif exp == "4":
         t0 = time.time()
-        exp4_result = run_experiment_4(loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions)
+        exp4_result = run_experiment_4(loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions, output_dir=out_dir)
         save_json(exp4_result, os.path.join(out_dir, "exp4_cross_topic_recall.json"))
         summary["experiment_4"] = exp4_result
         summary["runtime_seconds"] = round(time.time() - t0, 1)

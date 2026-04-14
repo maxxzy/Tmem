@@ -273,11 +273,11 @@ class TopicExtractor:
             if not mem_topic_ids:
                 mem_topic_ids = list(segment.topic_ids)
 
-                importance_raw = raw.get("importance", 0.5)
-                try:
-                    importance = float(importance_raw)
-                except (ValueError, TypeError):
-                    importance = 0.5
+            importance_raw = raw.get("importance", 0.5)
+            try:
+                importance = float(importance_raw)
+            except (ValueError, TypeError):
+                importance = 0.5
 
             memory = Memory(
                 content=content,
