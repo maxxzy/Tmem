@@ -25,7 +25,6 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "qwen3:30b")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "ollama"))
 LLM_TEMPERATURE = 0.3  # 较低温度以获得更稳定的结构化输出
-LLM_SEED = 42          # 固定随机种子，确保实验可复现
 
 # ======================== Neo4j 图数据库配置 ========================
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:17687")

@@ -71,7 +71,6 @@ class LLMService:
         kwargs = dict(
             model=self.model,
             temperature=config.LLM_TEMPERATURE,
-            seed=config.LLM_SEED,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},

@@ -37,6 +37,26 @@ logger = logging.getLogger("experiments")
 #  共享工具函数
 # ============================================================
 
+CATEGORY_NAMES = {
+    1: "多跳推理", 2: "时序问题", 3: "开放域",
+    4: "单跳事实", 5: "对抗性",
+}
+
+
+def _log_per_category(label: str, result: dict):
+    """打印 per_category 的 P@5 / R@5 明细"""
+    per_cat = result.get("per_category", {})
+    if not per_cat:
+        return
+    parts = []
+    for cat in sorted(per_cat, key=lambda c: int(c)):
+        cm = per_cat[cat]
+        name = CATEGORY_NAMES.get(int(cat), f"Cat{cat}")
+        parts.append(f"Cat{cat}({name}) P@5={cm['p5']:.4f} R@5={cm['r5']:.4f} n={cm['count']}")
+    logger.info(f"  {label} per_category:")
+    for p in parts:
+        logger.info(f"    {p}")
+
 def build_evidence_lookup(sample: dict) -> dict[str, str]:
     """
     构建 dia_id -> 原始对话文本 的映射表
@@ -420,11 +440,13 @@ def run_experiment_2(
         tmem_result = evaluate_sample_retrieval(tmem, qas, evidence_lookup, top_k, method="tmem")
         tmem_per_sample[sid] = tmem_result
         logger.info(f"  TMem   P@5={tmem_result['overall_p5']:.4f}  R@5={tmem_result['overall_r5']:.4f}")
+        _log_per_category("TMem", tmem_result)
 
         # Dense baseline 评测
         dense_result = evaluate_sample_retrieval(tmem, qas, evidence_lookup, top_k, method="dense")
         dense_per_sample[sid] = dense_result
         logger.info(f"  Dense  P@5={dense_result['overall_p5']:.4f}  R@5={dense_result['overall_r5']:.4f}")
+        _log_per_category("Dense", dense_result)
 
         tmem.close()
 
@@ -432,10 +454,21 @@ def run_experiment_2(
     def aggregate(per_sample):
         all_p = [v["overall_p5"] for v in per_sample.values()]
         all_r = [v["overall_r5"] for v in per_sample.values()]
+        cat_p, cat_r, cat_n = {}, {}, {}
+        for v in per_sample.values():
+            for cat, cm in v.get("per_category", {}).items():
+                cat_p.setdefault(cat, []).append(cm["p5"])
+                cat_r.setdefault(cat, []).append(cm["r5"])
+                cat_n[cat] = cat_n.get(cat, 0) + cm.get("count", 0)
+        per_category = {
+            cat: {"p5": round(np.mean(cat_p[cat]), 4), "r5": round(np.mean(cat_r[cat]), 4), "count": cat_n[cat]}
+            for cat in cat_p
+        }
         return {
             "overall_p5": round(np.mean(all_p), 4),
             "overall_r5": round(np.mean(all_r), 4),
             "per_sample": {k: {"p5": v["overall_p5"], "r5": v["overall_r5"]} for k, v in per_sample.items()},
+            "per_category": per_category,
         }
 
     return {
@@ -753,16 +786,27 @@ def run_experiment_4(
 # ============================================================
 
 def _aggregate_exp2(exp2_tmem, exp2_dense):
-    """汇总 exp2 结果"""
+    """汇总 exp2 结果，包含 per_category 聚合"""
     def agg(per_sample):
         all_p = [v["overall_p5"] for v in per_sample.values()]
         all_r = [v["overall_r5"] for v in per_sample.values()]
         if not all_p:
-            return {"overall_p5": 0.0, "overall_r5": 0.0, "per_sample": {}}
+            return {"overall_p5": 0.0, "overall_r5": 0.0, "per_sample": {}, "per_category": {}}
+        cat_p, cat_r, cat_n = {}, {}, {}
+        for v in per_sample.values():
+            for cat, cm in v.get("per_category", {}).items():
+                cat_p.setdefault(cat, []).append(cm["p5"])
+                cat_r.setdefault(cat, []).append(cm["r5"])
+                cat_n[cat] = cat_n.get(cat, 0) + cm.get("count", 0)
+        per_category = {
+            cat: {"p5": round(np.mean(cat_p[cat]), 4), "r5": round(np.mean(cat_r[cat]), 4), "count": cat_n[cat]}
+            for cat in cat_p
+        }
         return {
             "overall_p5": round(np.mean(all_p), 4),
             "overall_r5": round(np.mean(all_r), 4),
             "per_sample": {k: {"p5": v["overall_p5"], "r5": v["overall_r5"]} for k, v in per_sample.items()},
+            "per_category": per_category,
         }
     return {"tmem": agg(exp2_tmem), "dense_baseline": agg(exp2_dense)}
 
@@ -850,11 +894,13 @@ def run_combined_234(
         tmem_result = evaluate_sample_retrieval(tmem_full, qas, evidence_lookup, top_k, "tmem")
         exp2_tmem[sid] = tmem_result
         logger.info(f"  TMem  P@5={tmem_result['overall_p5']:.4f}  R@5={tmem_result['overall_r5']:.4f}")
+        _log_per_category("TMem", tmem_result)
 
         logger.info(f"[Exp2] Dense evaluation...")
         dense_result = evaluate_sample_retrieval(tmem_full, qas, evidence_lookup, top_k, "dense")
         exp2_dense[sid] = dense_result
         logger.info(f"  Dense P@5={dense_result['overall_p5']:.4f}  R@5={dense_result['overall_r5']:.4f}")
+        _log_per_category("Dense", dense_result)
 
         # 增量保存 exp2
         save_json(_aggregate_exp2(exp2_tmem, exp2_dense), exp2_path)
@@ -1010,8 +1056,16 @@ def main():
         save_json(exp4_result, os.path.join(out_dir, "exp4_cross_topic_recall.json"))
 
         summary["experiment_2"] = {
-            "tmem": {"p5": exp2_result["tmem"]["overall_p5"], "r5": exp2_result["tmem"]["overall_r5"]},
-            "dense": {"p5": exp2_result["dense_baseline"]["overall_p5"], "r5": exp2_result["dense_baseline"]["overall_r5"]},
+            "tmem": {
+                "p5": exp2_result["tmem"]["overall_p5"],
+                "r5": exp2_result["tmem"]["overall_r5"],
+                "per_category": exp2_result["tmem"].get("per_category", {}),
+            },
+            "dense": {
+                "p5": exp2_result["dense_baseline"]["overall_p5"],
+                "r5": exp2_result["dense_baseline"]["overall_r5"],
+                "per_category": exp2_result["dense_baseline"].get("per_category", {}),
+            },
         }
         summary["experiment_3"] = {v: {"p5": d["p5"], "r5": d["r5"]} for v, d in exp3_result["variants"].items()}
         summary["experiment_4"] = exp4_result
@@ -1022,8 +1076,16 @@ def main():
         exp2_result = run_experiment_2(loader, use_neo4j, use_qdrant, args.top_k, args.max_sessions)
         save_json(exp2_result, os.path.join(out_dir, "exp2_locomo_evaluation.json"))
         summary["experiment_2"] = {
-            "tmem": {"p5": exp2_result["tmem"]["overall_p5"], "r5": exp2_result["tmem"]["overall_r5"]},
-            "dense": {"p5": exp2_result["dense_baseline"]["overall_p5"], "r5": exp2_result["dense_baseline"]["overall_r5"]},
+            "tmem": {
+                "p5": exp2_result["tmem"]["overall_p5"],
+                "r5": exp2_result["tmem"]["overall_r5"],
+                "per_category": exp2_result["tmem"].get("per_category", {}),
+            },
+            "dense": {
+                "p5": exp2_result["dense_baseline"]["overall_p5"],
+                "r5": exp2_result["dense_baseline"]["overall_r5"],
+                "per_category": exp2_result["dense_baseline"].get("per_category", {}),
+            },
             "runtime_seconds": round(time.time() - t0, 1),
         }
 
