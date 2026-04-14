@@ -457,14 +457,19 @@ class TopicRetriever:
             global_count = 0
             for hit in global_hits:
                 mid = hit["memory_id"]
+                dense_score = hit["score"] * config.GLOBAL_DENSE_WEIGHT
                 if mid in existing_ids:
+                    # 已存在的记忆取较高分（确保不低于 Dense）
+                    for r in all_results:
+                        if r.memory.memory_id == mid:
+                            r.score = max(r.score, dense_score)
+                            break
                     continue
                 mem = self.memories.get(mid)
                 if not mem:
                     continue
-                score = hit["score"] * config.GLOBAL_DENSE_WEIGHT
                 all_results.append(RetrievalResult(
-                    memory=mem, score=score, source_type="global_dense", matched_topics=[],
+                    memory=mem, score=dense_score, source_type="global_dense", matched_topics=[],
                 ))
                 existing_ids.add(mid)
                 global_count += 1

@@ -63,18 +63,32 @@ class TopicAssociationGraph:
 
     def compute_cooccurrence(self):
         """
-        统计所有记忆的主题共现频次
-        由于每条记忆标注了多个主题，同一记忆的不同主题天然形成共现
+        统计所有记忆的主题共现频次（软共现）
+
+        除了记忆原始标注的主题外，还通过 embedding 相似度
+        将记忆与高相关主题建立软关联，以解决 LLM 单主题标注的瓶颈。
         """
         self._cooccurrence.clear()
         self._total_memories = len(self.memories)
 
         for mem in self.memories.values():
-            topics = mem.topic_ids
-            # 同一记忆内的所有主题两两共现
-            for i in range(len(topics)):
-                for j in range(i + 1, len(topics)):
-                    pair = self._ordered_pair(topics[i], topics[j])
+            # 原始标注的主题 + 基于 embedding 相似度的软关联主题
+            related = list(mem.topic_ids)
+            if mem.embedding is not None:
+                for tid, topic in self.topics.items():
+                    if topic.is_virtual or tid in related:
+                        continue
+                    if topic.label_embedding is not None:
+                        sim = EmbeddingService.cosine_similarity(
+                            mem.embedding, topic.label_embedding
+                        )
+                        if sim >= config.SOFT_COOCCURRENCE_SIM_THRESHOLD:
+                            related.append(tid)
+
+            # 所有关联主题两两共现
+            for i in range(len(related)):
+                for j in range(i + 1, len(related)):
+                    pair = self._ordered_pair(related[i], related[j])
                     self._cooccurrence[pair] += 1
 
     def compute_npmi(self, tid_a: str, tid_b: str) -> float:

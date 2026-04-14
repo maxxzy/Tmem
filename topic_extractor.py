@@ -137,13 +137,15 @@ class TopicExtractor:
         """
         将新生成的主题标签与已有主题比较（多信号融合）
 
-        综合相似度 = α1·cos(label_emb) + α2·cos(summary_emb) + α3·Jaccard(keywords)
+        综合相似度 = α1·cos(label_emb) + α2·cos(summary_emb) + α3·Jaccard(keywords) + α4·token_overlap
         当 summary 不可用时，其权重转移给 label embedding。
         若最高相似度超过阈值，归入已有主题并返回其 id；否则返回 None。
         """
-        a1, a2, a3 = config.TOPIC_SIM_WEIGHTS
+        a1, a2, a3, a4 = config.TOPIC_SIM_WEIGHTS
         if keywords is None:
             keywords = set()
+
+        new_tokens = set(label.lower().split())
 
         best_sim = 0.0
         best_topic_id = None
@@ -169,6 +171,12 @@ class TopicExtractor:
                 union = keywords | topic.keywords
                 jaccard = len(intersection) / len(union) if union else 0.0
                 sim += a3 * jaccard
+
+            # Token 重叠率（containment 度量，捕捉子串关系）
+            existing_tokens = set(topic.label.lower().split())
+            if new_tokens and existing_tokens:
+                overlap = len(new_tokens & existing_tokens) / min(len(new_tokens), len(existing_tokens))
+                sim += a4 * overlap
 
             if sim > best_sim:
                 best_sim = sim

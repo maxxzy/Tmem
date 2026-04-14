@@ -68,9 +68,9 @@ class TopicDAG:
     def compute_topic_similarity(self, t1: Topic, t2: Topic) -> float:
         """
         计算两个主题的综合相似度
-        sim(t_i, t_j) = α1·cos(e_i, e_j) + α2·cos(e^s_i, e^s_j) + α3·Jaccard(K_i, K_j)
+        sim = α1·cos(label) + α2·cos(summary) + α3·Jaccard(keywords) + α4·token_overlap
         """
-        a1, a2, a3 = config.TOPIC_SIM_WEIGHTS
+        a1, a2, a3, a4 = config.TOPIC_SIM_WEIGHTS
         sim = 0.0
 
         # 标签嵌入相似度
@@ -97,6 +97,13 @@ class TopicDAG:
             union = t1.keywords | t2.keywords
             jaccard = len(intersection) / len(union) if union else 0.0
             sim += a3 * jaccard
+
+        # Token 重叠率（containment 度量）
+        tokens1 = set(t1.label.lower().split())
+        tokens2 = set(t2.label.lower().split())
+        if tokens1 and tokens2:
+            overlap = len(tokens1 & tokens2) / min(len(tokens1), len(tokens2))
+            sim += a4 * overlap
 
         return sim
 
