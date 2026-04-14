@@ -189,6 +189,7 @@ class TopicRetriever:
         query: str,
         query_emb: np.ndarray,
         candidate_topics: list[tuple[str, float]],
+        scoring_topic_ids: set[str] | None = None,
     ) -> list[RetrievalResult]:
         """
         在候选主题下的记忆集中检索
@@ -197,14 +198,15 @@ class TopicRetriever:
         否则回退到内存遍历方式。
         """
         if self.qdrant is not None:
-            return self._intra_via_qdrant(query, query_emb, candidate_topics)
-        return self._intra_via_memory(query, query_emb, candidate_topics)
+            return self._intra_via_qdrant(query, query_emb, candidate_topics, scoring_topic_ids)
+        return self._intra_via_memory(query, query_emb, candidate_topics, scoring_topic_ids)
 
     def _intra_via_qdrant(
         self,
         query: str,
         query_emb: np.ndarray,
         candidate_topics: list[tuple[str, float]],
+        scoring_topic_ids: set[str] | None = None,
     ) -> list[RetrievalResult]:
         """利用 Qdrant 的标量过滤进行主题内向量检索"""
         topic_ids = [tid for tid, _ in candidate_topics]
@@ -241,7 +243,13 @@ class TopicRetriever:
             )
 
             importance = hit["payload"].get("importance", 0.5)
-            score = 0.75 * vec_sim + 0.10 * best_topic_score + keyword_bonus + 0.05 * importance
+
+            # 仅评分主题内的记忆获得 topic bonus
+            mem_topic_set = set(mem_topics)
+            if scoring_topic_ids and mem_topic_set & scoring_topic_ids:
+                score = vec_sim + 0.20 * best_topic_score + keyword_bonus + 0.08 * importance
+            else:
+                score = vec_sim
 
             matched_ts = [t for t in mem_topics if t in topic_score_map]
             results.append(RetrievalResult(
@@ -259,6 +267,7 @@ class TopicRetriever:
         query: str,
         query_emb: np.ndarray,
         candidate_topics: list[tuple[str, float]],
+        scoring_topic_ids: set[str] | None = None,
     ) -> list[RetrievalResult]:
         """回退方式：遍历内存中的记忆进行主题内检索"""
         query_lower = query.lower()
@@ -283,7 +292,12 @@ class TopicRetriever:
                     matched = sum(1 for kw in mem.keywords if kw.lower() in query_lower)
                     keyword_bonus = 0.1 * (matched / max(len(mem.keywords), 1))
 
-                score = 0.75 * vec_sim + 0.10 * topic_score + keyword_bonus + 0.05 * mem.importance
+                # 仅评分主题内的记忆获得 topic bonus
+                if scoring_topic_ids and tid in scoring_topic_ids:
+                    score = vec_sim + 0.20 * topic_score + keyword_bonus + 0.08 * mem.importance
+                else:
+                    score = vec_sim
+
                 results.append(RetrievalResult(
                     memory=mem, score=score, source_type="intra", matched_topics=[tid],
                 ))
@@ -440,8 +454,11 @@ class TopicRetriever:
         # 2. DAG 调整
         adjusted_topics = self.adjust_topics_by_dag(scored_topics)
 
+        # 提取评分主题：仅 top-N 高置信度主题的记忆获得 topic bonus
+        scoring_topic_ids = {tid for tid, _ in adjusted_topics[:config.SCORING_TOPIC_COUNT]}
+
         # 3. 主题内检索
-        intra_results = self.retrieve_intra_topic(query, query_emb, adjusted_topics)
+        intra_results = self.retrieve_intra_topic(query, query_emb, adjusted_topics, scoring_topic_ids)
         logger.info(f"主题内检索: {len(intra_results)} 条结果")
 
         # 4. 全局 Dense 融合（始终执行，作为主题路由的安全网）
@@ -451,7 +468,7 @@ class TopicRetriever:
         if self.qdrant is not None:
             global_hits = self.qdrant.search_memories(
                 query_embedding=query_emb,
-                top_k=top_k,
+                top_k=top_k * 2,  # 扩大候选池，增强安全网覆盖
                 topic_ids=None,  # 不过滤主题
             )
             global_count = 0

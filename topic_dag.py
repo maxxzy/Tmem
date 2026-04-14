@@ -194,6 +194,12 @@ class TopicDAG:
                     is_virtual=True,
                     depth=depth,
                 )
+                # 收集子主题的 keywords 并集，供多父边相似度计算使用
+                child_keywords = set()
+                for idx in member_indices:
+                    child_topic = self.topics[leaf_topics[idx].topic_id]
+                    child_keywords |= child_topic.keywords
+                virtual_topic.keywords = child_keywords
                 self.topics[virtual_topic.topic_id] = virtual_topic
 
                 # 建立父子关系：虚拟节点 -> 叶子主题

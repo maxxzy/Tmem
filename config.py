@@ -63,7 +63,7 @@ TOPIC_SIM_WEIGHTS = (0.35, 0.25, 0.20, 0.20)  # alpha1, alpha2, alpha3, alpha4
 HAC_DISTANCE_THRESHOLDS = [0.7, 0.5, 0.3]
 
 # 多归属阈值：主题与非当前父节点的上层节点相似度超过此值时添加多父边
-MULTI_PARENT_THRESHOLD = 0.7  # beta
+MULTI_PARENT_THRESHOLD = 0.55  # beta（降低以配合虚拟主题补充 keywords 后跨分支发现）
 # 多父边 LLM 调用次数上限（按相似度降序取 top-N 候选对）
 MAX_MULTI_PARENT_LLM_CALLS = 50
 
@@ -122,6 +122,8 @@ MAX_ROUTED_TOPICS = 7
 MIN_ROUTED_TOPICS = 3
 # 主题内记忆检索的 top-K
 INTRA_TOPIC_TOP_K = 10
+# 评分主题数量：仅 top-N 路由主题内的记忆获得 topic bonus 加分
+SCORING_TOPIC_COUNT = 3
 # 跨主题扩展的记忆权重折扣因子
 CROSS_TOPIC_WEIGHT_DISCOUNT = 0.7
 # 全局 Dense 融合权重折扣因子（1.0 = 不折扣，确保 TMem 不低于 Dense）
