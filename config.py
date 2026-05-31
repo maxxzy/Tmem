@@ -123,11 +123,11 @@ MIN_ROUTED_TOPICS = 3
 # 主题内记忆检索的 top-K
 INTRA_TOPIC_TOP_K = 10
 # 评分主题数量：仅 top-N 路由主题内的记忆获得 topic bonus 加分
-SCORING_TOPIC_COUNT = 3
+SCORING_TOPIC_COUNT = 5
 # 跨主题扩展的记忆权重折扣因子
 CROSS_TOPIC_WEIGHT_DISCOUNT = 0.7
 # 全局 Dense 融合权重折扣因子（1.0 = 不折扣，确保 TMem 不低于 Dense）
-GLOBAL_DENSE_WEIGHT = 1.0
+GLOBAL_DENSE_WEIGHT = 0.8
 # 证据匹配 embedding 相似度阈值（用于评测时判断检索结果是否命中 evidence）
 EVIDENCE_MATCH_SIM_THRESHOLD = 0.6
 # 推理关键词，出现时触发跨主题扩展

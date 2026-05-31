@@ -1,0 +1,842 @@
+{
+  "description": "TMem full pipeline example output — LoCoMo conv-26 (Caroline & Melanie), sessions 1-3",
+  "pipeline_overview": "Phase1: Topic-aware Memory Extraction → Phase2: Topic Hierarchy Index (DAG + Association Graph) → Phase3: Topic-routed Retrieval",
+  "speakers": {
+    "speaker_a": "Caroline",
+    "speaker_b": "Melanie"
+  },
+
+  "_comment_phase1": "===== Phase 1: Topic-aware Memory Extraction (topic_extractor.py) =====",
+
+  "topic_segments": [
+    {
+      "segment_id": "seg_1",
+      "session_id": "session_1",
+      "turn_range": ["D1:1", "D1:7"],
+      "session_time": "2023-05-08T13:56:00",
+      "boundary_info": {
+        "prev_boundary_similarity": null,
+        "next_boundary_similarity": 0.31,
+        "boundary_trigger": "sim(0.31) < TOPIC_BOUNDARY_SIMILARITY_THRESHOLD(0.35)"
+      },
+      "raw_labels": [
+        {"label": "LGBTQ Support Group", "keywords": ["support group", "LGBTQ", "acceptance", "community", "inspiring stories"]},
+        {"label": "Transgender Identity", "keywords": ["transgender", "coming out", "self-acceptance", "courage", "embrace"]}
+      ],
+      "topic_matching": [
+        {
+          "label": "LGBTQ Support Group",
+          "is_new": true,
+          "matched_existing_topic": null,
+          "match_reason": "No existing topic found, creating new topic"
+        },
+        {
+          "label": "Transgender Identity",
+          "is_new": true,
+          "matched_existing_topic": null,
+          "match_reason": "No existing topic found, creating new topic"
+        }
+      ]
+    },
+    {
+      "segment_id": "seg_2",
+      "session_id": "session_1",
+      "turn_range": ["D1:8", "D1:12"],
+      "session_time": "2023-05-08T13:56:00",
+      "boundary_info": {
+        "prev_boundary_similarity": 0.31,
+        "next_boundary_similarity": 0.27,
+        "boundary_trigger": "sim(0.27) < 0.35"
+      },
+      "raw_labels": [
+        {"label": "Career Planning", "keywords": ["education", "counseling", "mental health career", "helping others"]}
+      ],
+      "topic_matching": [
+        {
+          "label": "Career Planning",
+          "is_new": true,
+          "matched_existing_topic": null,
+          "match_reason": "No existing topic found, creating new topic"
+        }
+      ]
+    },
+    {
+      "segment_id": "seg_3",
+      "session_id": "session_1",
+      "turn_range": ["D1:12", "D1:18"],
+      "session_time": "2023-05-08T13:56:00",
+      "boundary_info": {
+        "prev_boundary_similarity": 0.27,
+        "next_boundary_similarity": null,
+        "boundary_trigger": "end of session"
+      },
+      "raw_labels": [
+        {"label": "Painting and Art", "keywords": ["painting", "sunrise", "colors", "creative expression"]},
+        {"label": "Self-Care", "keywords": ["relaxation", "unwinding", "swimming", "outlet"]}
+      ],
+      "topic_matching": [
+        {"label": "Painting and Art", "is_new": true, "matched_existing_topic": null, "match_reason": "No existing topic found"},
+        {"label": "Self-Care", "is_new": true, "matched_existing_topic": null, "match_reason": "No existing topic found"}
+      ]
+    },
+    {
+      "segment_id": "seg_4",
+      "session_id": "session_2",
+      "turn_range": ["D2:1", "D2:7"],
+      "session_time": "2023-05-25T13:14:00",
+      "boundary_info": {
+        "prev_boundary_similarity": null,
+        "next_boundary_similarity": 0.26,
+        "boundary_trigger": "sim(0.26) < 0.35"
+      },
+      "raw_labels": [
+        {"label": "Mental Health Awareness", "keywords": ["charity race", "mental health", "awareness", "fundraising"]},
+        {"label": "Self-Care", "keywords": ["relaxation", "me-time", "running", "reading", "violin"]}
+      ],
+      "topic_matching": [
+        {"label": "Mental Health Awareness", "is_new": true, "matched_existing_topic": null, "match_reason": "No existing topic found"},
+        {
+          "label": "Self-Care",
+          "is_new": false,
+          "matched_existing_topic": "Self-Care",
+          "match_reason": "Exact match (identical label, short-circuit return)"
+        }
+      ]
+    },
+    {
+      "segment_id": "seg_5",
+      "session_id": "session_2",
+      "turn_range": ["D2:8", "D2:17"],
+      "session_time": "2023-05-25T13:14:00",
+      "boundary_info": {
+        "prev_boundary_similarity": 0.26,
+        "next_boundary_similarity": null,
+        "boundary_trigger": "end of session"
+      },
+      "raw_labels": [
+        {"label": "Adoption", "keywords": ["adoption agency", "family", "children", "loving home", "single parent"]},
+        {"label": "LGBTQ Support Group", "keywords": ["LGBTQ+", "inclusivity", "support", "community"]}
+      ],
+      "topic_matching": [
+        {"label": "Adoption", "is_new": true, "matched_existing_topic": null, "match_reason": "No existing topic found"},
+        {
+          "label": "LGBTQ Support Group",
+          "is_new": false,
+          "matched_existing_topic": "LGBTQ Support Group",
+          "match_reason": "Exact match (identical label)"
+        }
+      ]
+    },
+    {
+      "segment_id": "seg_6",
+      "session_id": "session_3",
+      "turn_range": ["D3:1", "D3:9"],
+      "session_time": "2023-06-09T19:55:00",
+      "boundary_info": {
+        "prev_boundary_similarity": null,
+        "next_boundary_similarity": 0.30,
+        "boundary_trigger": "sim(0.30) < 0.35"
+      },
+      "raw_labels": [
+        {"label": "LGBTQ Advocacy", "keywords": ["school speech", "awareness", "inclusivity", "encouraging students"]},
+        {"label": "Transgender Identity", "keywords": ["transgender journey", "struggles", "growth", "coming out"]}
+      ],
+      "topic_matching": [
+        {"label": "LGBTQ Advocacy", "is_new": true, "matched_existing_topic": null, "match_reason": "No existing topic found"},
+        {
+          "label": "Transgender Identity",
+          "is_new": false,
+          "matched_existing_topic": "Transgender Identity",
+          "match_reason": "Exact match (identical label)"
+        }
+      ]
+    },
+    {
+      "segment_id": "seg_7",
+      "session_id": "session_3",
+      "turn_range": ["D3:10", "D3:23"],
+      "session_time": "2023-06-09T19:55:00",
+      "boundary_info": {
+        "prev_boundary_similarity": 0.30,
+        "next_boundary_similarity": null,
+        "boundary_trigger": "end of session"
+      },
+      "raw_labels": [
+        {"label": "Personal Support Network", "keywords": ["friends", "mentors", "motivation", "support system", "moved from Sweden"]},
+        {"label": "Family Life", "keywords": ["husband", "kids", "marriage", "wedding", "family time", "games"]}
+      ],
+      "topic_matching": [
+        {"label": "Personal Support Network", "is_new": true, "matched_existing_topic": null, "match_reason": "No existing topic found"},
+        {"label": "Family Life", "is_new": true, "matched_existing_topic": null, "match_reason": "No existing topic found"}
+      ]
+    }
+  ],
+
+  "extracted_memories": [
+    {
+      "memory_id": "m_001",
+      "content": "Caroline attended an LGBTQ support group on 7 May 2023 and found the experience very powerful and inspiring.",
+      "source_segment_id": "seg_1",
+      "source_dia_ids": ["D1:3", "D1:4"],
+      "topic_ids": ["LGBTQ Support Group"],
+      "keywords": ["LGBTQ", "support group", "May 2023", "inspiring"],
+      "importance": 0.7
+    },
+    {
+      "memory_id": "m_002",
+      "content": "Caroline is a transgender woman who was deeply moved by the transgender stories shared at the support group.",
+      "source_segment_id": "seg_1",
+      "source_dia_ids": ["D1:5"],
+      "topic_ids": ["LGBTQ Support Group", "Transgender Identity"],
+      "keywords": ["transgender", "stories", "support group", "moved"],
+      "importance": 0.8
+    },
+    {
+      "memory_id": "m_003",
+      "content": "The LGBTQ support group made Caroline feel accepted and gave her the courage to fully embrace herself.",
+      "source_segment_id": "seg_1",
+      "source_dia_ids": ["D1:7"],
+      "topic_ids": ["LGBTQ Support Group", "Transgender Identity"],
+      "keywords": ["acceptance", "courage", "embrace", "LGBTQ"],
+      "importance": 0.8
+    },
+    {
+      "memory_id": "m_004",
+      "content": "Caroline plans to continue her education and explore career options, particularly in counseling or mental health.",
+      "source_segment_id": "seg_2",
+      "source_dia_ids": ["D1:9", "D1:11"],
+      "topic_ids": ["Career Planning"],
+      "keywords": ["education", "career", "counseling", "mental health"],
+      "importance": 0.7
+    },
+    {
+      "memory_id": "m_005",
+      "content": "Caroline wants to work in counseling or mental health to support people who face challenges similar to her own transgender experience.",
+      "source_segment_id": "seg_2",
+      "source_dia_ids": ["D1:11"],
+      "topic_ids": ["Career Planning", "Transgender Identity"],
+      "keywords": ["counseling", "mental health", "transgender", "helping others"],
+      "importance": 0.8
+    },
+    {
+      "memory_id": "m_006",
+      "content": "Melanie painted a lake sunrise in 2022, which holds special personal significance to her.",
+      "source_segment_id": "seg_3",
+      "source_dia_ids": ["D1:14"],
+      "topic_ids": ["Painting and Art"],
+      "keywords": ["painting", "lake", "sunrise", "2022"],
+      "importance": 0.5
+    },
+    {
+      "memory_id": "m_007",
+      "content": "Melanie uses painting as a creative outlet to express her feelings and relax after long days.",
+      "source_segment_id": "seg_3",
+      "source_dia_ids": ["D1:16"],
+      "topic_ids": ["Painting and Art", "Self-Care"],
+      "keywords": ["painting", "creative outlet", "relaxation", "feelings"],
+      "importance": 0.6
+    },
+    {
+      "memory_id": "m_008",
+      "content": "Melanie went swimming with her kids after the conversation on 8 May 2023.",
+      "source_segment_id": "seg_3",
+      "source_dia_ids": ["D1:18"],
+      "topic_ids": ["Self-Care"],
+      "keywords": ["swimming", "kids", "May 2023"],
+      "importance": 0.4
+    },
+    {
+      "memory_id": "m_009",
+      "content": "Melanie ran a charity race for mental health awareness the Saturday before 25 May 2023 and found it very rewarding.",
+      "source_segment_id": "seg_4",
+      "source_dia_ids": ["D2:1"],
+      "topic_ids": ["Mental Health Awareness"],
+      "keywords": ["charity race", "mental health", "rewarding"],
+      "importance": 0.7
+    },
+    {
+      "memory_id": "m_010",
+      "content": "Melanie started prioritizing self-care after the charity race, carving out daily me-time for running, reading, or playing violin.",
+      "source_segment_id": "seg_4",
+      "source_dia_ids": ["D2:3", "D2:5"],
+      "topic_ids": ["Mental Health Awareness", "Self-Care"],
+      "keywords": ["self-care", "me-time", "running", "reading", "violin"],
+      "importance": 0.7
+    },
+    {
+      "memory_id": "m_011",
+      "content": "Melanie's family is planning to go camping in June 2023 during the kids' summer break.",
+      "source_segment_id": "seg_4",
+      "source_dia_ids": ["D2:7"],
+      "topic_ids": ["Self-Care"],
+      "keywords": ["camping", "family", "June 2023", "summer break"],
+      "importance": 0.5
+    },
+    {
+      "memory_id": "m_012",
+      "content": "Caroline has been researching adoption agencies because she dreams of having a family and giving a loving home to children in need.",
+      "source_segment_id": "seg_5",
+      "source_dia_ids": ["D2:8"],
+      "topic_ids": ["Adoption"],
+      "keywords": ["adoption", "agency", "family", "loving home"],
+      "importance": 0.8
+    },
+    {
+      "memory_id": "m_013",
+      "content": "Caroline chose an adoption agency specifically because it supports LGBTQ+ individuals in the adoption process.",
+      "source_segment_id": "seg_5",
+      "source_dia_ids": ["D2:12"],
+      "topic_ids": ["Adoption", "LGBTQ Support Group"],
+      "keywords": ["adoption agency", "LGBTQ+", "inclusive"],
+      "importance": 0.8
+    },
+    {
+      "memory_id": "m_014",
+      "content": "Caroline is currently single and plans to pursue adoption as a single parent despite the challenges.",
+      "source_segment_id": "seg_5",
+      "source_dia_ids": ["D2:14"],
+      "topic_ids": ["Adoption"],
+      "keywords": ["single parent", "adoption", "challenges"],
+      "importance": 0.7
+    },
+    {
+      "memory_id": "m_015",
+      "content": "Caroline is grateful for the support from friends and mentors as she works toward her adoption goal.",
+      "source_segment_id": "seg_5",
+      "source_dia_ids": ["D2:10", "D2:16"],
+      "topic_ids": ["Adoption", "LGBTQ Support Group"],
+      "keywords": ["friends", "mentors", "support", "adoption"],
+      "importance": 0.6
+    },
+    {
+      "memory_id": "m_016",
+      "content": "Caroline gave a speech at a school the week before 9 June 2023 about her transgender journey to encourage student involvement in the LGBTQ community.",
+      "source_segment_id": "seg_6",
+      "source_dia_ids": ["D3:1", "D3:3"],
+      "topic_ids": ["LGBTQ Advocacy", "Transgender Identity"],
+      "keywords": ["school speech", "transgender", "LGBTQ", "students"],
+      "importance": 0.8
+    },
+    {
+      "memory_id": "m_017",
+      "content": "Caroline shared her personal struggles and growth since coming out during the school speech, and felt empowered by the experience.",
+      "source_segment_id": "seg_6",
+      "source_dia_ids": ["D3:3", "D3:5"],
+      "topic_ids": ["LGBTQ Advocacy", "Transgender Identity"],
+      "keywords": ["coming out", "struggles", "growth", "empowered"],
+      "importance": 0.7
+    },
+    {
+      "memory_id": "m_018",
+      "content": "Caroline believes that sharing personal experiences publicly helps promote understanding and acceptance of the LGBTQ community.",
+      "source_segment_id": "seg_6",
+      "source_dia_ids": ["D3:5", "D3:7"],
+      "topic_ids": ["LGBTQ Advocacy"],
+      "keywords": ["public speaking", "understanding", "acceptance", "LGBTQ"],
+      "importance": 0.6
+    },
+    {
+      "memory_id": "m_019",
+      "content": "Caroline met up with her friends, family, and mentors the week before 9 June 2023.",
+      "source_segment_id": "seg_7",
+      "source_dia_ids": ["D3:11"],
+      "topic_ids": ["Personal Support Network"],
+      "keywords": ["friends", "family", "mentors", "meetup"],
+      "importance": 0.4
+    },
+    {
+      "memory_id": "m_020",
+      "content": "Caroline has known her current group of friends for 4 years, since she moved from Sweden.",
+      "source_segment_id": "seg_7",
+      "source_dia_ids": ["D3:13"],
+      "topic_ids": ["Personal Support Network"],
+      "keywords": ["friends", "4 years", "Sweden", "moved"],
+      "importance": 0.6
+    },
+    {
+      "memory_id": "m_021",
+      "content": "Melanie has been married for 5 years as of June 2023.",
+      "source_segment_id": "seg_7",
+      "source_dia_ids": ["D3:16"],
+      "topic_ids": ["Family Life"],
+      "keywords": ["married", "5 years", "husband"],
+      "importance": 0.6
+    },
+    {
+      "memory_id": "m_022",
+      "content": "Melanie's husband and kids are her primary source of motivation; she feels most alive during family time.",
+      "source_segment_id": "seg_7",
+      "source_dia_ids": ["D3:14", "D3:22"],
+      "topic_ids": ["Family Life", "Personal Support Network"],
+      "keywords": ["husband", "kids", "motivation", "family time"],
+      "importance": 0.7
+    },
+    {
+      "memory_id": "m_023",
+      "content": "Melanie cherishes family activities like playing games, eating together, and hanging out.",
+      "source_segment_id": "seg_7",
+      "source_dia_ids": ["D3:20"],
+      "topic_ids": ["Family Life"],
+      "keywords": ["games", "eating together", "family activities"],
+      "importance": 0.5
+    }
+  ],
+
+  "_comment_phase2": "===== Phase 2: Topic Hierarchy Index (topic_dag.py + topic_graph.py) =====",
+
+  "topic_registry": {
+    "_comment": "10 leaf topics (non-virtual), extracted in Phase 1",
+    "LGBTQ Support Group": {
+      "topic_id": "t_001",
+      "is_virtual": false,
+      "keywords": ["support group", "LGBTQ", "LGBTQ+", "acceptance", "community", "inclusivity", "inspiring stories"],
+      "memory_ids": ["m_001", "m_002", "m_003", "m_013", "m_015"],
+      "summary": "Caroline attended an LGBTQ support group in May 2023 and found it transformative. The community support gave her courage to embrace her transgender identity. She later chose an LGBTQ-friendly adoption agency, reflecting the ongoing importance of inclusive support in her life decisions.",
+      "depth": 3
+    },
+    "Transgender Identity": {
+      "topic_id": "t_002",
+      "is_virtual": false,
+      "keywords": ["transgender", "coming out", "self-acceptance", "courage", "embrace", "transgender journey", "struggles", "growth"],
+      "memory_ids": ["m_002", "m_003", "m_005", "m_016", "m_017"],
+      "summary": "Caroline is a transgender woman who draws strength from her journey of self-acceptance. Her transgender experience shapes both her career aspirations in mental health counseling and her public advocacy, including giving speeches at schools.",
+      "depth": 3
+    },
+    "Career Planning": {
+      "topic_id": "t_003",
+      "is_virtual": false,
+      "keywords": ["education", "counseling", "mental health career", "helping others", "career options"],
+      "memory_ids": ["m_004", "m_005"],
+      "summary": "Caroline is pursuing education and exploring a career in counseling or mental health, motivated by her desire to support others who face challenges similar to her own transgender experience.",
+      "depth": 2
+    },
+    "Painting and Art": {
+      "topic_id": "t_004",
+      "is_virtual": false,
+      "keywords": ["painting", "sunrise", "colors", "creative expression", "lake"],
+      "memory_ids": ["m_006", "m_007"],
+      "summary": "Melanie is an amateur painter who created a personally meaningful lake sunrise painting in 2022. She uses painting as a creative outlet for emotional expression and relaxation.",
+      "depth": 3
+    },
+    "Self-Care": {
+      "topic_id": "t_005",
+      "is_virtual": false,
+      "keywords": ["relaxation", "unwinding", "swimming", "outlet", "me-time", "running", "reading", "violin"],
+      "memory_ids": ["m_007", "m_008", "m_010", "m_011"],
+      "summary": "Melanie actively prioritizes self-care through various activities including painting, swimming with her kids, running, reading, and playing violin. She began emphasizing daily me-time after participating in a mental health charity race.",
+      "depth": 3
+    },
+    "Mental Health Awareness": {
+      "topic_id": "t_006",
+      "is_virtual": false,
+      "keywords": ["charity race", "mental health", "awareness", "fundraising"],
+      "memory_ids": ["m_009", "m_010"],
+      "summary": "Melanie ran a charity race for mental health awareness in May 2023, which proved to be a turning point in her approach to self-care.",
+      "depth": 3
+    },
+    "Adoption": {
+      "topic_id": "t_007",
+      "is_virtual": false,
+      "keywords": ["adoption agency", "family", "children", "loving home", "single parent"],
+      "memory_ids": ["m_012", "m_013", "m_014", "m_015"],
+      "summary": "Caroline is actively researching adoption as a single parent, having chosen an LGBTQ-friendly agency. She is determined to provide a loving home to children in need.",
+      "depth": 2
+    },
+    "LGBTQ Advocacy": {
+      "topic_id": "t_008",
+      "is_virtual": false,
+      "keywords": ["school speech", "awareness", "inclusivity", "encouraging students", "public speaking"],
+      "memory_ids": ["m_016", "m_017", "m_018"],
+      "summary": "Caroline gave a speech at a school in early June 2023 sharing her transgender journey. She believes public storytelling promotes understanding and acceptance of the LGBTQ community.",
+      "depth": 3
+    },
+    "Personal Support Network": {
+      "topic_id": "t_009",
+      "is_virtual": false,
+      "keywords": ["friends", "mentors", "motivation", "support system", "moved from Sweden"],
+      "memory_ids": ["m_019", "m_020", "m_022"],
+      "summary": "Caroline has a strong support network of friends, family, and mentors built over the 4 years since she moved from Sweden.",
+      "depth": 2
+    },
+    "Family Life": {
+      "topic_id": "t_010",
+      "is_virtual": false,
+      "keywords": ["husband", "kids", "marriage", "wedding", "family time", "games"],
+      "memory_ids": ["m_021", "m_022", "m_023"],
+      "summary": "Melanie has been married for 5 years and has children. Family time is her primary motivation and what makes her feel most alive.",
+      "depth": 2
+    }
+  },
+
+  "topic_dag": {
+    "_comment": "HAC clustering produces virtual topics + multi-parent edges → DAG structure",
+    "hac_config": {
+      "distance_thresholds": [0.7, 0.5, 0.3],
+      "similarity_formula": "alpha1*cos(label) + alpha2*cos(summary) + alpha3*Jaccard(kw) + alpha4*token_overlap",
+      "weights": [0.35, 0.25, 0.20, 0.20]
+    },
+    "virtual_topics": [
+      {
+        "topic_id": "v_001",
+        "label": "LGBTQ+ Identity & Support",
+        "is_virtual": true,
+        "depth": 2,
+        "child_ids": ["t_001", "t_002"],
+        "keywords_inherited_from_children": ["support group", "LGBTQ", "transgender", "coming out", "self-acceptance", "courage"],
+        "hac_layer": 3,
+        "hac_reason": "sim(LGBTQ Support Group, Transgender Identity) = 0.72 > 1 - 0.3 = 0.70"
+      },
+      {
+        "topic_id": "v_002",
+        "label": "Wellbeing & Self-Care",
+        "is_virtual": true,
+        "depth": 2,
+        "child_ids": ["t_004", "t_005", "t_006"],
+        "keywords_inherited_from_children": ["painting", "relaxation", "swimming", "running", "charity race", "mental health"],
+        "hac_layer": 3,
+        "hac_reason": "Self-Care, Painting and Art, Mental Health Awareness pairwise similarity > 0.30"
+      },
+      {
+        "topic_id": "v_003",
+        "label": "LGBTQ+ Advocacy & Community",
+        "is_virtual": true,
+        "depth": 2,
+        "child_ids": ["t_008"],
+        "keywords_inherited_from_children": ["school speech", "awareness", "inclusivity"],
+        "hac_layer": 2,
+        "hac_reason": "Merged with v_001 at coarser layer"
+      },
+      {
+        "topic_id": "v_004",
+        "label": "Social & Family Connections",
+        "is_virtual": true,
+        "depth": 1,
+        "child_ids": ["t_009", "t_010"],
+        "keywords_inherited_from_children": ["friends", "mentors", "husband", "kids", "family time"],
+        "hac_layer": 2,
+        "hac_reason": "sim(Personal Support Network, Family Life) = 0.58 > 1 - 0.5 = 0.50"
+      }
+    ],
+    "multi_parent_edges": [
+      {
+        "child": "LGBTQ Advocacy (t_008)",
+        "parent": "LGBTQ+ Identity & Support (v_001)",
+        "similarity": 0.62,
+        "llm_confirmed": true,
+        "reason": "LGBTQ Advocacy is a sub-topic of LGBTQ+ Identity & Support (LLM confirmed is-a relationship)"
+      },
+      {
+        "child": "Career Planning (t_003)",
+        "parent": "LGBTQ+ Identity & Support (v_001)",
+        "similarity": 0.57,
+        "llm_confirmed": true,
+        "reason": "Career Planning is motivated by Transgender Identity, has is-a/part-of relationship with LGBTQ+ topic cluster"
+      }
+    ],
+    "dag_hierarchy": {
+      "_comment": "ROOT(depth=0) → virtual topics(depth=1-2) → leaf topics(depth=2-3)",
+      "ROOT": {
+        "depth": 0,
+        "children": ["v_001", "v_002", "v_004", "t_003", "t_007"]
+      },
+      "v_001 (LGBTQ+ Identity & Support)": {
+        "depth": 1,
+        "children": ["t_001", "t_002", "t_008"],
+        "_note": "t_008 added via multi-parent edge"
+      },
+      "v_002 (Wellbeing & Self-Care)": {
+        "depth": 1,
+        "children": ["t_004", "t_005", "t_006"]
+      },
+      "v_004 (Social & Family Connections)": {
+        "depth": 1,
+        "children": ["t_009", "t_010"]
+      },
+      "t_003 (Career Planning)": {
+        "depth": 2,
+        "parents": ["ROOT", "v_001"],
+        "_note": "Multi-parent: attached to both ROOT and LGBTQ+ topic cluster"
+      },
+      "t_007 (Adoption)": {
+        "depth": 2,
+        "parents": ["ROOT"]
+      }
+    },
+    "post_dag_operations": {
+      "topic_merge_check": {
+        "threshold": 0.85,
+        "min_memory_count": 10,
+        "merges_found": 0,
+        "reason": "No sibling pair exceeds similarity threshold of 0.85"
+      },
+      "summary_updates": {
+        "trigger": "memory_count_since_summary >= SUMMARY_UPDATE_INTERVAL(5)",
+        "updated_topics": ["LGBTQ Support Group", "Transgender Identity"],
+        "reason": "These two topics each have 5 memories, triggering summary regeneration"
+      }
+    }
+  },
+
+  "topic_association_graph": {
+    "_comment": "Topic Association Graph (topic_graph.py): co-occurrence edges + LLM causal edges → pruning → PPR",
+
+    "cooccurrence_edges": {
+      "_comment": "Built from multi-topic memory membership (including soft co-occurrence)",
+      "soft_cooccurrence_config": {
+        "threshold": 0.5,
+        "method": "When sim(mem.embedding, topic.label_embedding) >= 0.5, the memory is considered softly associated with that topic"
+      },
+      "edges": [
+        {
+          "pair": ["LGBTQ Support Group", "Transgender Identity"],
+          "cooccurrence_count": 3,
+          "source": "hard (m_002, m_003, m_005 explicitly assigned to both topics)",
+          "npmi": 0.42,
+          "direction": "bidirectional",
+          "direction_reason": "|P(b|a) - P(a|b)| = |3/5 - 3/5| = 0 < epsilon(0.05)"
+        },
+        {
+          "pair": ["Painting and Art", "Self-Care"],
+          "cooccurrence_count": 1,
+          "source": "hard (m_007 assigned to both topics)",
+          "npmi": 0.31,
+          "direction": "Painting and Art → Self-Care",
+          "direction_reason": "P(Self-Care|Painting) = 1/2 > P(Painting|Self-Care) = 1/4, diff=0.25 > epsilon"
+        },
+        {
+          "pair": ["Mental Health Awareness", "Self-Care"],
+          "cooccurrence_count": 1,
+          "source": "hard (m_010 assigned to both topics)",
+          "npmi": 0.31,
+          "direction": "Mental Health Awareness → Self-Care",
+          "direction_reason": "P(Self-Care|MHA) = 1/2 > P(MHA|Self-Care) = 1/4, diff=0.25 > epsilon"
+        },
+        {
+          "pair": ["Adoption", "LGBTQ Support Group"],
+          "cooccurrence_count": 2,
+          "source": "hard (m_013, m_015 assigned to both topics)",
+          "npmi": 0.38,
+          "direction": "LGBTQ Support Group → Adoption",
+          "direction_reason": "|P(b|a) - P(a|b)| = |2/4 - 2/5| = 0.1 > epsilon"
+        },
+        {
+          "pair": ["Career Planning", "Transgender Identity"],
+          "cooccurrence_count": 1,
+          "source": "hard (m_005 assigned to both topics)",
+          "npmi": 0.36,
+          "direction": "Transgender Identity → Career Planning",
+          "direction_reason": "P(Career|Trans) = 1/5, P(Trans|Career) = 1/2, diff=-0.3 < -epsilon"
+        },
+        {
+          "pair": ["LGBTQ Advocacy", "Transgender Identity"],
+          "cooccurrence_count": 2,
+          "source": "hard (m_016, m_017 assigned to both topics)",
+          "npmi": 0.45,
+          "direction": "Transgender Identity → LGBTQ Advocacy",
+          "direction_reason": "P(Advocacy|Trans) = 2/5, P(Trans|Advocacy) = 2/3, diff=-0.27 < -epsilon"
+        },
+        {
+          "pair": ["Family Life", "Personal Support Network"],
+          "cooccurrence_count": 1,
+          "source": "hard (m_022 assigned to both topics)",
+          "npmi": 0.35,
+          "direction": "bidirectional",
+          "direction_reason": "|P(b|a) - P(a|b)| = |1/3 - 1/3| = 0 < epsilon"
+        },
+        {
+          "pair": ["Self-Care", "Family Life"],
+          "cooccurrence_count": 1,
+          "source": "soft (m_011 about camping, sim(m_011.embedding, Family Life.label_embedding) = 0.53 > 0.5)",
+          "npmi": 0.22,
+          "direction": "Self-Care → Family Life",
+          "direction_reason": "P(Family|Self-Care) = 1/4, P(Self-Care|Family) = 1/3, diff=-0.08 < -epsilon"
+        }
+      ]
+    },
+
+    "llm_causal_edges": {
+      "_comment": "For topic pairs with label_emb similarity in [0.3, 0.6] and no existing co-occurrence edge, LLM judges association",
+      "candidate_filter": "0.3 < cos(label_emb_a, label_emb_b) < 0.6, excluding pairs with existing co-occurrence edges",
+      "max_calls": 30,
+      "edges": [
+        {
+          "pair": ["Mental Health Awareness", "Career Planning"],
+          "label_sim": 0.47,
+          "llm_judgment": {"related": true, "type": "complementary", "score": 0.6, "direction": "bidirectional"},
+          "reason": "LLM: mental health awareness and mental health career planning are complementary"
+        },
+        {
+          "pair": ["LGBTQ Advocacy", "Adoption"],
+          "label_sim": 0.38,
+          "llm_judgment": {"related": true, "type": "conditional", "score": 0.5, "direction": "LGBTQ Advocacy → Adoption"},
+          "reason": "LLM: LGBTQ rights advocacy creates conditions for LGBTQ adoption"
+        },
+        {
+          "pair": ["Personal Support Network", "LGBTQ Support Group"],
+          "label_sim": 0.42,
+          "llm_judgment": {"related": true, "type": "complementary", "score": 0.55, "direction": "bidirectional"},
+          "reason": "LLM: both are different facets of social support systems"
+        }
+      ]
+    },
+
+    "edge_weight_unification": {
+      "formula": "w = 0.4 * npmi_mem + 0.4 * llm_score + 0.2 * npmi_temp",
+      "prune_threshold": 0.08,
+      "max_out_degree": 5,
+      "example": {
+        "edge": "LGBTQ Support Group <-> Transgender Identity",
+        "npmi_mem": 0.42,
+        "llm_score": 0.0,
+        "npmi_temp": 0.0,
+        "weight": "0.4 * 0.42 + 0.4 * 0.0 + 0.2 * 0.0 = 0.168 (> 0.08, kept)"
+      }
+    },
+
+    "final_edges_after_pruning": [
+      {"source": "LGBTQ Support Group", "target": "Transgender Identity", "weight": 0.168, "type": "co"},
+      {"source": "Transgender Identity", "target": "LGBTQ Advocacy", "weight": 0.180, "type": "co"},
+      {"source": "Transgender Identity", "target": "Career Planning", "weight": 0.144, "type": "co"},
+      {"source": "LGBTQ Support Group", "target": "Adoption", "weight": 0.152, "type": "co"},
+      {"source": "Painting and Art", "target": "Self-Care", "weight": 0.124, "type": "co"},
+      {"source": "Mental Health Awareness", "target": "Self-Care", "weight": 0.124, "type": "co"},
+      {"source": "Family Life", "target": "Personal Support Network", "weight": 0.140, "type": "co"},
+      {"source": "Self-Care", "target": "Family Life", "weight": 0.088, "type": "co"},
+      {"source": "Mental Health Awareness", "target": "Career Planning", "weight": 0.240, "type": "complementary"},
+      {"source": "LGBTQ Advocacy", "target": "Adoption", "weight": 0.200, "type": "conditional"},
+      {"source": "Personal Support Network", "target": "LGBTQ Support Group", "weight": 0.220, "type": "complementary"}
+    ]
+  },
+
+  "_comment_phase3": "===== Phase 3: Topic-routed Retrieval Examples (topic_retrieval.py) =====",
+
+  "retrieval_examples": [
+    {
+      "query": "What does Caroline plan to do for a career?",
+      "category": "Cat4 (single-hop factual)",
+
+      "step1_topic_routing": {
+        "method": "cos(query_emb, topic_label_emb) + keyword + summary multi-signal",
+        "max_routed_topics": 7,
+        "scored_topics": [
+          {"topic": "Career Planning", "score": 0.82},
+          {"topic": "Mental Health Awareness", "score": 0.41},
+          {"topic": "Transgender Identity", "score": 0.38}
+        ]
+      },
+
+      "step2_dag_adjustment": {
+        "method": "If routed topics < MIN_ROUTED_TOPICS(3), expand siblings along DAG",
+        "adjusted_topics": [
+          {"topic": "Career Planning", "score": 0.82},
+          {"topic": "Mental Health Awareness", "score": 0.41},
+          {"topic": "Transgender Identity", "score": 0.38}
+        ],
+        "note": "Already 3 topics >= MIN_ROUTED_TOPICS, no adjustment needed"
+      },
+
+      "step3_intra_topic_retrieval": {
+        "method": "Qdrant filtered by topic_ids → vec_sim + topic_bonus + kw_bonus + importance_bonus",
+        "scoring_formula": "score = vec_sim + 0.10 * best_topic_score + keyword_bonus + 0.05 * importance",
+        "top_results": [
+          {"memory": "m_004", "vec_sim": 0.78, "topic_score": 0.82, "score": 0.897, "source": "intra"},
+          {"memory": "m_005", "vec_sim": 0.72, "topic_score": 0.82, "score": 0.842, "source": "intra"},
+          {"memory": "m_009", "vec_sim": 0.35, "topic_score": 0.41, "score": 0.426, "source": "intra"}
+        ]
+      },
+
+      "step4_global_dense_fusion": {
+        "method": "Unfiltered vector search across all memories, GLOBAL_DENSE_WEIGHT=1.0, take max with intra scores",
+        "global_hits": [
+          {"memory": "m_004", "dense_score": 0.78, "action": "Already exists, max(0.897, 0.78) = 0.897 unchanged"},
+          {"memory": "m_005", "dense_score": 0.72, "action": "Already exists, max(0.842, 0.72) = 0.842 unchanged"},
+          {"memory": "m_016", "dense_score": 0.45, "action": "New addition, source=global_dense"},
+          {"memory": "m_010", "dense_score": 0.38, "action": "New addition, source=global_dense"}
+        ],
+        "note": "Intra results have higher scores due to topic bonus, ranking preserved; global dense adds memories not covered by intra"
+      },
+
+      "step5_cross_topic_expansion": {
+        "trigger_check": {
+          "intra_results_empty": false,
+          "contains_reasoning_keywords": false,
+          "contains_enumeration_keywords": false,
+          "avg_score_below_threshold": false
+        },
+        "triggered": false,
+        "reason": "No trigger condition met, skipping cross-topic expansion"
+      },
+
+      "final_top5": [
+        {"memory": "m_004", "score": 0.897, "source": "intra", "correct": true},
+        {"memory": "m_005", "score": 0.842, "source": "intra", "correct": true},
+        {"memory": "m_016", "score": 0.450, "source": "global_dense", "correct": false},
+        {"memory": "m_009", "score": 0.426, "source": "intra", "correct": false},
+        {"memory": "m_010", "score": 0.380, "source": "global_dense", "correct": false}
+      ],
+      "P_at_5": 0.4,
+      "R_at_5": 1.0
+    },
+    {
+      "query": "What are all the ways Melanie takes care of herself?",
+      "category": "Cat3 (open-domain / enumeration)",
+
+      "step1_topic_routing": {
+        "scored_topics": [
+          {"topic": "Self-Care", "score": 0.85},
+          {"topic": "Mental Health Awareness", "score": 0.52},
+          {"topic": "Painting and Art", "score": 0.44}
+        ]
+      },
+
+      "step2_dag_adjustment": {
+        "adjusted_topics": [
+          {"topic": "Self-Care", "score": 0.85},
+          {"topic": "Mental Health Awareness", "score": 0.52},
+          {"topic": "Painting and Art", "score": 0.44}
+        ],
+        "note": "3 topics >= MIN_ROUTED_TOPICS, no adjustment needed"
+      },
+
+      "step3_intra_topic_retrieval": {
+        "top_results": [
+          {"memory": "m_010", "vec_sim": 0.71, "score": 0.830, "source": "intra"},
+          {"memory": "m_007", "vec_sim": 0.68, "score": 0.798, "source": "intra"},
+          {"memory": "m_008", "vec_sim": 0.62, "score": 0.733, "source": "intra"},
+          {"memory": "m_009", "vec_sim": 0.55, "score": 0.637, "source": "intra"},
+          {"memory": "m_006", "vec_sim": 0.48, "score": 0.559, "source": "intra"}
+        ]
+      },
+
+      "step4_global_dense_fusion": {
+        "note": "Global dense results highly overlap with intra results; intra scores are higher (topic bonus), ranking unchanged"
+      },
+
+      "step5_cross_topic_expansion": {
+        "trigger_check": {
+          "intra_results_empty": false,
+          "contains_enumeration_keywords": true,
+          "keyword_matched": "all the"
+        },
+        "triggered": true,
+        "ppr_seeds": ["t_005", "t_006", "t_004"],
+        "ppr_expanded_topics": [
+          {"topic": "Family Life", "activation": 0.12, "reason": "Self-Care → Family Life edge weight 0.088"},
+          {"topic": "Personal Support Network", "activation": 0.05, "reason": "Family Life → Personal Support Network edge weight 0.140 (two-hop propagation)"}
+        ],
+        "cross_topic_results": [
+          {"memory": "m_011", "score": "0.42 * 0.7(discount) = 0.294", "source": "cross", "note": "Camping plan; belongs to Self-Care but was filtered out, recovered via Family Life expansion"}
+        ]
+      },
+
+      "final_top5": [
+        {"memory": "m_010", "score": 0.830, "source": "intra", "content_preview": "daily me-time: running, reading, violin"},
+        {"memory": "m_007", "score": 0.798, "source": "intra", "content_preview": "painting as creative outlet"},
+        {"memory": "m_008", "score": 0.733, "source": "intra", "content_preview": "swimming with kids"},
+        {"memory": "m_009", "score": 0.637, "source": "intra", "content_preview": "charity race"},
+        {"memory": "m_006", "score": 0.559, "source": "intra", "content_preview": "lake sunrise painting"}
+      ],
+      "note": "Cross-topic expansion found m_011 (camping) but its discounted score (0.294) did not make it into top-5"
+    }
+  ]
+}

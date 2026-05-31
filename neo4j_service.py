@@ -27,11 +27,33 @@ class Neo4jService:
         user: str = config.NEO4J_USER,
         password: str = config.NEO4J_PASSWORD,
         database: str = config.NEO4J_DATABASE,
+        namespace: str | None = None,
     ):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self.database = database
+        self.namespace = self._normalize_namespace(namespace)
         self._ensure_constraints()
-        logger.info(f"Neo4j 连接成功: {uri}")
+        logger.info(
+            f"Neo4j 连接成功: {uri}"
+            f" (namespace={self.namespace or 'default'})"
+        )
+
+    @staticmethod
+    def _normalize_namespace(namespace: str | None) -> str:
+        if not namespace:
+            return ""
+        normalized = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in namespace)
+        return normalized[:48].strip("_")
+
+    def _topic_id(self, topic_id: str) -> str:
+        if not self.namespace:
+            return topic_id
+        return f"{self.namespace}:topic:{topic_id}"
+
+    def _memory_id(self, memory_id: str) -> str:
+        if not self.namespace:
+            return memory_id
+        return f"{self.namespace}:memory:{memory_id}"
 
     def close(self):
         self.driver.close()
@@ -57,7 +79,19 @@ class Neo4jService:
 
     def clear_all(self):
         """清空数据库中所有 TMem 相关数据"""
-        self._run("MATCH (n) DETACH DELETE n")
+        if not self.namespace:
+            self._run("MATCH (n) DETACH DELETE n")
+        else:
+            self._run(
+                """
+                MATCH (n)
+                WHERE (n:Topic AND n.topic_id STARTS WITH $topic_prefix)
+                   OR (n:Memory AND n.memory_id STARTS WITH $memory_prefix)
+                DETACH DELETE n
+                """,
+                topic_prefix=self._topic_id(""),
+                memory_prefix=self._memory_id(""),
+            )
         logger.info("Neo4j 数据已清空")
 
     # ======================== Topic 节点 CRUD ========================
@@ -76,7 +110,8 @@ class Neo4jService:
         self._run(
             """
             MERGE (t:Topic {topic_id: $topic_id})
-            SET t.label = $label,
+            SET t.raw_topic_id = $raw_topic_id,
+                t.label = $label,
                 t.keywords = $keywords,
                 t.summary = $summary,
                 t.is_virtual = $is_virtual,
@@ -84,7 +119,8 @@ class Neo4jService:
                 t.memory_count = $memory_count,
                 t.updated_at = datetime()
             """,
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
+            raw_topic_id=topic_id,
             label=label,
             keywords=keywords,
             summary=summary,
@@ -97,20 +133,61 @@ class Neo4jService:
         """删除 Topic 节点及其所有关系"""
         self._run(
             "MATCH (t:Topic {topic_id: $topic_id}) DETACH DELETE t",
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
         )
 
     def get_topic(self, topic_id: str) -> dict | None:
         """获取单个 Topic 节点"""
         result = self._run(
-            "MATCH (t:Topic {topic_id: $topic_id}) RETURN t",
-            topic_id=topic_id,
+            """
+            MATCH (t:Topic {topic_id: $topic_id})
+            RETURN {
+                topic_id: coalesce(t.raw_topic_id, t.topic_id),
+                label: t.label,
+                keywords: t.keywords,
+                summary: t.summary,
+                is_virtual: t.is_virtual,
+                depth: t.depth,
+                memory_count: t.memory_count
+            } AS topic
+            """,
+            topic_id=self._topic_id(topic_id),
         )
-        return result[0]["t"] if result else None
+        return result[0]["topic"] if result else None
 
     def get_all_topics(self) -> list[dict]:
         """获取所有 Topic 节点"""
-        return self._run("MATCH (t:Topic) RETURN t")
+        if not self.namespace:
+            return self._run(
+                """
+                MATCH (t:Topic)
+                RETURN {
+                    topic_id: coalesce(t.raw_topic_id, t.topic_id),
+                    label: t.label,
+                    keywords: t.keywords,
+                    summary: t.summary,
+                    is_virtual: t.is_virtual,
+                    depth: t.depth,
+                    memory_count: t.memory_count
+                } AS topic
+                """
+            )
+        return self._run(
+            """
+            MATCH (t:Topic)
+            WHERE t.topic_id STARTS WITH $topic_prefix
+            RETURN {
+                topic_id: coalesce(t.raw_topic_id, t.topic_id),
+                label: t.label,
+                keywords: t.keywords,
+                summary: t.summary,
+                is_virtual: t.is_virtual,
+                depth: t.depth,
+                memory_count: t.memory_count
+            } AS topic
+            """,
+            topic_prefix=self._topic_id(""),
+        )
 
     # ======================== DAG 父子关系 ========================
 
@@ -122,8 +199,8 @@ class Neo4jService:
             MATCH (c:Topic {topic_id: $child_id})
             MERGE (p)-[:PARENT_OF]->(c)
             """,
-            parent_id=parent_id,
-            child_id=child_id,
+            parent_id=self._topic_id(parent_id),
+            child_id=self._topic_id(child_id),
         )
 
     def remove_parent_edge(self, child_id: str, parent_id: str):
@@ -133,8 +210,8 @@ class Neo4jService:
             MATCH (p:Topic {topic_id: $parent_id})-[r:PARENT_OF]->(c:Topic {topic_id: $child_id})
             DELETE r
             """,
-            parent_id=parent_id,
-            child_id=child_id,
+            parent_id=self._topic_id(parent_id),
+            child_id=self._topic_id(child_id),
         )
 
     def get_children(self, topic_id: str) -> list[str]:
@@ -142,9 +219,9 @@ class Neo4jService:
         result = self._run(
             """
             MATCH (p:Topic {topic_id: $topic_id})-[:PARENT_OF]->(c:Topic)
-            RETURN c.topic_id AS child_id
+            RETURN coalesce(c.raw_topic_id, c.topic_id) AS child_id
             """,
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
         )
         return [r["child_id"] for r in result]
 
@@ -153,9 +230,9 @@ class Neo4jService:
         result = self._run(
             """
             MATCH (p:Topic)-[:PARENT_OF]->(c:Topic {topic_id: $topic_id})
-            RETURN p.topic_id AS parent_id
+            RETURN coalesce(p.raw_topic_id, p.topic_id) AS parent_id
             """,
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
         )
         return [r["parent_id"] for r in result]
 
@@ -166,9 +243,9 @@ class Neo4jService:
             MATCH (p:Topic)-[:PARENT_OF]->(c:Topic {topic_id: $topic_id})
             MATCH (p)-[:PARENT_OF]->(s:Topic)
             WHERE s.topic_id <> $topic_id
-            RETURN DISTINCT s.topic_id AS sibling_id
+            RETURN DISTINCT coalesce(s.raw_topic_id, s.topic_id) AS sibling_id
             """,
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
         )
         return [r["sibling_id"] for r in result]
 
@@ -177,9 +254,9 @@ class Neo4jService:
         result = self._run(
             """
             MATCH (p:Topic {topic_id: $topic_id})-[:PARENT_OF*1..]->(d:Topic)
-            RETURN DISTINCT d.topic_id AS desc_id
+            RETURN DISTINCT coalesce(d.raw_topic_id, d.topic_id) AS desc_id
             """,
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
         )
         return [r["desc_id"] for r in result]
 
@@ -188,9 +265,9 @@ class Neo4jService:
         result = self._run(
             """
             MATCH (a:Topic)-[:PARENT_OF*1..]->(c:Topic {topic_id: $topic_id})
-            RETURN DISTINCT a.topic_id AS anc_id
+            RETURN DISTINCT coalesce(a.raw_topic_id, a.topic_id) AS anc_id
             """,
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
         )
         return [r["anc_id"] for r in result]
 
@@ -219,8 +296,8 @@ class Neo4jService:
                 r.npmi_temp = $npmi_temp,
                 r.last_updated = datetime()
             """,
-            source_id=source_id,
-            target_id=target_id,
+            source_id=self._topic_id(source_id),
+            target_id=self._topic_id(target_id),
             weight=weight,
             edge_type=edge_type,
             npmi_mem=npmi_mem,
@@ -235,8 +312,8 @@ class Neo4jService:
             MATCH (s:Topic {topic_id: $source_id})-[r:ASSOCIATED_WITH]->(t:Topic {topic_id: $target_id})
             DELETE r
             """,
-            source_id=source_id,
-            target_id=target_id,
+            source_id=self._topic_id(source_id),
+            target_id=self._topic_id(target_id),
         )
 
     def get_association_edges(self, source_id: str) -> list[dict]:
@@ -244,29 +321,53 @@ class Neo4jService:
         return self._run(
             """
             MATCH (s:Topic {topic_id: $source_id})-[r:ASSOCIATED_WITH]->(t:Topic)
-            RETURN t.topic_id AS target_id, r.weight AS weight,
+                 RETURN coalesce(t.raw_topic_id, t.topic_id) AS target_id, r.weight AS weight,
                    r.edge_type AS edge_type, r.npmi_mem AS npmi_mem,
                    r.llm_score AS llm_score, r.npmi_temp AS npmi_temp
             ORDER BY r.weight DESC
             """,
-            source_id=source_id,
+                 source_id=self._topic_id(source_id),
         )
 
     def get_all_association_edges(self) -> list[dict]:
         """获取所有关联图边"""
+        if not self.namespace:
+            return self._run(
+                """
+                MATCH (s:Topic)-[r:ASSOCIATED_WITH]->(t:Topic)
+                RETURN coalesce(s.raw_topic_id, s.topic_id) AS source_id,
+                       coalesce(t.raw_topic_id, t.topic_id) AS target_id,
+                       r.weight AS weight, r.edge_type AS edge_type,
+                       r.npmi_mem AS npmi_mem, r.llm_score AS llm_score,
+                       r.npmi_temp AS npmi_temp
+                """
+            )
         return self._run(
             """
             MATCH (s:Topic)-[r:ASSOCIATED_WITH]->(t:Topic)
-            RETURN s.topic_id AS source_id, t.topic_id AS target_id,
+            WHERE s.topic_id STARTS WITH $topic_prefix AND t.topic_id STARTS WITH $topic_prefix
+            RETURN coalesce(s.raw_topic_id, s.topic_id) AS source_id,
+                   coalesce(t.raw_topic_id, t.topic_id) AS target_id,
                    r.weight AS weight, r.edge_type AS edge_type,
                    r.npmi_mem AS npmi_mem, r.llm_score AS llm_score,
                    r.npmi_temp AS npmi_temp
-            """
+            """,
+            topic_prefix=self._topic_id(""),
         )
 
     def clear_association_edges(self):
         """清除所有关联图边（保留 DAG 边）"""
-        self._run("MATCH ()-[r:ASSOCIATED_WITH]->() DELETE r")
+        if not self.namespace:
+            self._run("MATCH ()-[r:ASSOCIATED_WITH]->() DELETE r")
+        else:
+            self._run(
+                """
+                MATCH (s:Topic)-[r:ASSOCIATED_WITH]->(t:Topic)
+                WHERE s.topic_id STARTS WITH $topic_prefix AND t.topic_id STARTS WITH $topic_prefix
+                DELETE r
+                """,
+                topic_prefix=self._topic_id(""),
+            )
 
     # ======================== 主题-记忆归属关系 ========================
 
@@ -275,9 +376,11 @@ class Neo4jService:
         self._run(
             """
             MERGE (m:Memory {memory_id: $memory_id})
-            SET m.content = $content
+            SET m.raw_memory_id = $raw_memory_id,
+                m.content = $content
             """,
-            memory_id=memory_id,
+            memory_id=self._memory_id(memory_id),
+            raw_memory_id=memory_id,
             content=content,
         )
 
@@ -289,8 +392,8 @@ class Neo4jService:
             MATCH (m:Memory {memory_id: $memory_id})
             MERGE (t)-[:HAS_MEMORY]->(m)
             """,
-            topic_id=topic_id,
-            memory_id=memory_id,
+            topic_id=self._topic_id(topic_id),
+            memory_id=self._memory_id(memory_id),
         )
 
     def get_memory_ids_by_topic(self, topic_id: str) -> list[str]:
@@ -298,9 +401,9 @@ class Neo4jService:
         result = self._run(
             """
             MATCH (t:Topic {topic_id: $topic_id})-[:HAS_MEMORY]->(m:Memory)
-            RETURN m.memory_id AS memory_id
+            RETURN coalesce(m.raw_memory_id, m.memory_id) AS memory_id
             """,
-            topic_id=topic_id,
+            topic_id=self._topic_id(topic_id),
         )
         return [r["memory_id"] for r in result]
 
@@ -309,9 +412,9 @@ class Neo4jService:
         result = self._run(
             """
             MATCH (t:Topic)-[:HAS_MEMORY]->(m:Memory {memory_id: $memory_id})
-            RETURN t.topic_id AS topic_id
+            RETURN coalesce(t.raw_topic_id, t.topic_id) AS topic_id
             """,
-            memory_id=memory_id,
+            memory_id=self._memory_id(memory_id),
         )
         return [r["topic_id"] for r in result]
 

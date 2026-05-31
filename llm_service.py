@@ -38,11 +38,10 @@ class LLMService:
     def _extract_json_from_text(text: str) -> dict | list:
         """
         在文本中搜索最佳的 JSON 数组或对象。
-        优先返回 dict 或包含 dict 的数组（结构化输出），
+        仅返回 dict 或包含 dict 的数组（结构化输出），
         跳过纯基本类型数组（如 ["keyword1", ...]，通常是 think 块中的片段）。
         """
         decoder = json.JSONDecoder()
-        first_found = None
         for start_char in ("[", "{"):
             search_from = 0
             while search_from < len(text):
@@ -51,19 +50,14 @@ class LLMService:
                     break
                 try:
                     result, end_idx = decoder.raw_decode(text, pos)
-                    # 优先返回 dict 或数组中包含 dict 的结构化结果
+                    # 仅返回 dict 或数组中包含 dict 的结构化结果
                     if isinstance(result, dict):
                         return result
                     if isinstance(result, list) and result and isinstance(result[0], dict):
                         return result
-                    # 记住第一个有效 JSON 作为最终回退
-                    if first_found is None:
-                        first_found = result
                     search_from = end_idx
                 except json.JSONDecodeError:
                     search_from = pos + 1
-        if first_found is not None:
-            return first_found
         raise json.JSONDecodeError("No valid JSON found in text", text[:200], 0)
 
     def _chat(self, system_prompt: str, user_prompt: str, extra_params: dict | None = None, *, return_raw: bool = False):

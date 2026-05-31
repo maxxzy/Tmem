@@ -33,19 +33,38 @@ class QdrantService:
         self,
         host: str = config.QDRANT_HOST,
         port: int = config.QDRANT_PORT,
+        namespace: str | None = None,
     ):
+        self.namespace = self._normalize_namespace(namespace)
+        self.memories_collection = self._collection_name(config.QDRANT_COLLECTION_MEMORIES)
+        self.topics_collection = self._collection_name(config.QDRANT_COLLECTION_TOPICS)
         self.client = QdrantClient(host=host, port=port, check_compatibility=False)
         self._ensure_collections()
-        logger.info(f"Qdrant 连接成功: {host}:{port}")
+        logger.info(
+            f"Qdrant 连接成功: {host}:{port}"
+            f" (namespace={self.namespace or 'default'})"
+        )
+
+    @staticmethod
+    def _normalize_namespace(namespace: str | None) -> str:
+        if not namespace:
+            return ""
+        normalized = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in namespace)
+        return normalized[:48].strip("_")
+
+    def _collection_name(self, base_name: str) -> str:
+        if not self.namespace:
+            return base_name
+        return f"{base_name}_{self.namespace}"
 
     def _ensure_collections(self):
         """确保所需的集合存在"""
         existing = {c.name for c in self.client.get_collections().collections}
 
         # 记忆向量集合
-        if config.QDRANT_COLLECTION_MEMORIES not in existing:
+        if self.memories_collection not in existing:
             self.client.create_collection(
-                collection_name=config.QDRANT_COLLECTION_MEMORIES,
+                collection_name=self.memories_collection,
                 vectors_config=VectorParams(
                     size=config.EMBEDDING_DIM,
                     distance=Distance.COSINE,
@@ -53,16 +72,16 @@ class QdrantService:
             )
             # 创建 payload 索引，加速按主题过滤
             self.client.create_payload_index(
-                collection_name=config.QDRANT_COLLECTION_MEMORIES,
+                collection_name=self.memories_collection,
                 field_name="topic_ids",
                 field_schema="keyword",
             )
-            logger.info(f"创建 Qdrant 集合: {config.QDRANT_COLLECTION_MEMORIES}")
+            logger.info(f"创建 Qdrant 集合: {self.memories_collection}")
 
         # 主题向量集合（存储标签嵌入和摘要嵌入）
-        if config.QDRANT_COLLECTION_TOPICS not in existing:
+        if self.topics_collection not in existing:
             self.client.create_collection(
-                collection_name=config.QDRANT_COLLECTION_TOPICS,
+                collection_name=self.topics_collection,
                 vectors_config={
                     "label": VectorParams(
                         size=config.EMBEDDING_DIM,
@@ -74,12 +93,12 @@ class QdrantService:
                     ),
                 },
             )
-            logger.info(f"创建 Qdrant 集合: {config.QDRANT_COLLECTION_TOPICS}")
+            logger.info(f"创建 Qdrant 集合: {self.topics_collection}")
 
     def clear_all(self):
         """清空所有集合数据"""
-        self.client.delete_collection(config.QDRANT_COLLECTION_MEMORIES)
-        self.client.delete_collection(config.QDRANT_COLLECTION_TOPICS)
+        self.client.delete_collection(self.memories_collection)
+        self.client.delete_collection(self.topics_collection)
         self._ensure_collections()
         logger.info("Qdrant 数据已清空")
 
@@ -93,7 +112,7 @@ class QdrantService:
     ):
         """插入或更新一条记忆向量"""
         self.client.upsert(
-            collection_name=config.QDRANT_COLLECTION_MEMORIES,
+            collection_name=self.memories_collection,
             points=[
                 PointStruct(
                     id=memory_id,
@@ -127,7 +146,7 @@ class QdrantService:
         batch_size = 100
         for i in range(0, len(points), batch_size):
             self.client.upsert(
-                collection_name=config.QDRANT_COLLECTION_MEMORIES,
+                collection_name=self.memories_collection,
                 points=points[i : i + batch_size],
             )
         logger.info(f"批量上传 {len(points)} 条记忆向量到 Qdrant")
@@ -163,7 +182,7 @@ class QdrantService:
             )
 
         results = self.client.query_points(
-            collection_name=config.QDRANT_COLLECTION_MEMORIES,
+            collection_name=self.memories_collection,
             query=query_embedding.tolist(),
             query_filter=query_filter,
             limit=top_k,
@@ -219,7 +238,7 @@ class QdrantService:
             return
 
         self.client.upsert(
-            collection_name=config.QDRANT_COLLECTION_TOPICS,
+            collection_name=self.topics_collection,
             points=[
                 PointStruct(
                     id=topic_id,
@@ -234,7 +253,7 @@ class QdrantService:
     ) -> list[dict]:
         """用 query 向量在主题标签嵌入空间中检索最相似的主题"""
         results = self.client.query_points(
-            collection_name=config.QDRANT_COLLECTION_TOPICS,
+            collection_name=self.topics_collection,
             query=query_embedding.tolist(),
             using="label",
             limit=top_k,
@@ -253,7 +272,7 @@ class QdrantService:
     ) -> list[dict]:
         """用 query 向量在主题摘要嵌入空间中检索最相似的主题"""
         results = self.client.query_points(
-            collection_name=config.QDRANT_COLLECTION_TOPICS,
+            collection_name=self.topics_collection,
             query=query_embedding.tolist(),
             using="summary",
             limit=top_k,

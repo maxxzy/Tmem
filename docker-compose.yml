@@ -1,0 +1,27 @@
+services:
+  neo4j:
+    image: neo4j:5
+    container_name: tmem-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"
+      - "17687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/MyPass123
+    volumes:
+      - tmem_neo4j_data:/data
+      - tmem_neo4j_logs:/logs
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: tmem-qdrant
+    restart: unless-stopped
+    ports:
+      - "16333:6333"
+    volumes:
+      - tmem_qdrant_storage:/qdrant/storage
+
+volumes:
+  tmem_neo4j_data:
+  tmem_neo4j_logs:
+  tmem_qdrant_storage:

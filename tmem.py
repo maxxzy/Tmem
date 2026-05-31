@@ -65,7 +65,9 @@ class TMem:
         # 是否启用外部数据库（设为 False 则仅使用内存）
         use_neo4j: bool = True,
         use_qdrant: bool = True,
+        storage_namespace: str | None = None,
     ):
+        self.storage_namespace = storage_namespace or ""
         # 基础服务
         self.emb_service = EmbeddingService()
         self.llm_service = LLMService(
@@ -79,14 +81,21 @@ class TMem:
         if use_neo4j:
             try:
                 self.neo4j = Neo4jService(
-                    uri=neo4j_uri, user=neo4j_user, password=neo4j_password,
+                    uri=neo4j_uri,
+                    user=neo4j_user,
+                    password=neo4j_password,
+                    namespace=self.storage_namespace,
                 )
             except Exception as e:
                 logger.warning(f"Neo4j 连接失败，回退到纯内存模式: {e}")
 
         if use_qdrant:
             try:
-                self.qdrant = QdrantService(host=qdrant_host, port=qdrant_port)
+                self.qdrant = QdrantService(
+                    host=qdrant_host,
+                    port=qdrant_port,
+                    namespace=self.storage_namespace,
+                )
             except Exception as e:
                 logger.warning(f"Qdrant 连接失败，回退到纯内存模式: {e}")
 
@@ -106,7 +115,8 @@ class TMem:
         logger.info(
             f"TMem 初始化完成 "
             f"(Neo4j={'ON' if self.neo4j else 'OFF'}, "
-            f"Qdrant={'ON' if self.qdrant else 'OFF'})"
+            f"Qdrant={'ON' if self.qdrant else 'OFF'}, "
+            f"namespace={self.storage_namespace or 'default'})"
         )
 
     def close(self):

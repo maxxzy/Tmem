@@ -444,7 +444,7 @@ class TopicDAG:
                 parent = self.topics.get(pid)
                 if not parent:
                     continue
-                for sibling_id in parent.child_ids:
+                for sibling_id in list(parent.child_ids):
                     if sibling_id == tid:
                         continue
                     pair = tuple(sorted([tid, sibling_id]))

@@ -145,7 +145,14 @@ class TopicExtractor:
         if keywords is None:
             keywords = set()
 
-        new_tokens = set(label.lower().split())
+        label_lower = label.strip().lower()
+        new_tokens = set(label_lower.split())
+
+        # 精确匹配短路：标签完全相同时直接归入
+        for tid, topic in self.topics.items():
+            if topic.label.strip().lower() == label_lower:
+                logger.debug(f"主题 '{label}' 精确匹配已有主题 '{topic.label}'")
+                return tid
 
         best_sim = 0.0
         best_topic_id = None
