@@ -43,6 +43,10 @@ def _wait_for_http(url: str, timeout_seconds: float) -> None:
             with urlopen(url, timeout=3) as response:
                 if response.status < 500:
                     return
+        except TimeoutError as error:
+            last_error = error
+        except socket.timeout as error:
+            last_error = error
         except HTTPError as error:
             if error.code < 500:
                 return
