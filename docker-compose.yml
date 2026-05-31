@@ -4,7 +4,6 @@ services:
     container_name: tmem-neo4j
     restart: unless-stopped
     ports:
-      - "7474:7474"
       - "17687:7687"
     environment:
       NEO4J_AUTH: neo4j/MyPass123

@@ -1,4 +1,5 @@
 import argparse
+import socket
 import shutil
 import subprocess
 import time
@@ -54,6 +55,22 @@ def _wait_for_http(url: str, timeout_seconds: float) -> None:
     raise RuntimeError(f"等待服务就绪超时: {url}; last_error={last_error}")
 
 
+def _wait_for_tcp(host: str, port: int, timeout_seconds: float) -> None:
+    deadline = time.time() + timeout_seconds
+    last_error = None
+
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=3):
+                return
+        except OSError as error:
+            last_error = error
+
+        time.sleep(2)
+
+    raise RuntimeError(f"等待服务就绪超时: {host}:{port}; last_error={last_error}")
+
+
 def ensure_tmem_full_infra(
     compose_file: str | Path = DEFAULT_COMPOSE_FILE,
     timeout_seconds: float = 120.0,
@@ -69,7 +86,7 @@ def ensure_tmem_full_infra(
         check=True,
     )
 
-    _wait_for_http("http://127.0.0.1:7474", timeout_seconds)
+    _wait_for_tcp("127.0.0.1", 17687, timeout_seconds)
     _wait_for_http("http://127.0.0.1:16333/collections", timeout_seconds)
 
 

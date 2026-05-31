@@ -186,7 +186,8 @@ Important:
 - This evaluation integration always builds one TMem instance per speaker perspective. The default `make run-tmem` path keeps those instances in-process only, while `make run-tmem-full` enables Neo4j and Qdrant.
 - The default `make run-tmem` path keeps this simplified in-process mode for quick evaluation parity.
 - The `make run-tmem-full` path uses namespaced Neo4j/Qdrant storage so each speaker perspective remains isolated while preserving the same output JSON format expected by `evals.py`.
-- The root [docker-compose.yml](../docker-compose.yml) maps ports to TMem's default config values: Neo4j Bolt `17687`, Neo4j Browser `7474`, and Qdrant `16333`.
+- The root [docker-compose.yml](../docker-compose.yml) maps the runtime ports TMem actually needs by default: Neo4j Bolt `17687` and Qdrant `16333`.
+- Neo4j Browser port `7474` is not published by the auto-deploy path, so an existing host service on `7474` will no longer block evaluation runs.
 - Docker auto-deployment only starts Neo4j and Qdrant. Your LLM and embedding endpoints still need to be reachable through [evaluation/.env.example](.env.example) -> `.env`.
 - TMem's own extraction and retrieval LLM backends still read the repository-level environment variables such as `LLM_MODEL`, `LLM_BASE_URL`, `LLM_API_KEY`, `EMBEDDING_BACKEND`, `OLLAMA_EMBEDDING_MODEL`, and `OLLAMA_EMBEDDING_URL`.
 - Final answer generation in the evaluation framework still uses `MODEL`, `OPENAI_API_KEY`, and optionally `OPENAI_BASE_URL`.
