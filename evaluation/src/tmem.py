@@ -50,6 +50,7 @@ class TMemEvaluator:
         use_full_architecture: bool = False,
     ):
         self.output_path = output_path
+        Path(self.output_path).parent.mkdir(parents=True, exist_ok=True)
         self.top_k = top_k
         self.use_full_architecture = use_full_architecture
         self.results = defaultdict(list)

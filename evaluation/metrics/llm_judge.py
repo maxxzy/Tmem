@@ -2,12 +2,31 @@ import argparse
 import json
 import os
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*_args, **_kwargs):
+        return False
+
 from openai import OpenAI
 
-client = OpenAI()
-JUDGE_MODEL = os.getenv("JUDGE_MODEL", os.getenv("MODEL", "gpt-4o-mini"))
+EVAL_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(EVAL_DIR / ".env")
+load_dotenv()
+
+
+def _get_client() -> OpenAI:
+    return OpenAI(
+        api_key=os.getenv("OPENAI_API_KEY", "ollama"),
+        base_url=os.getenv("OPENAI_BASE_URL"),
+    )
+
+
+def _get_judge_model() -> str:
+    return os.getenv("JUDGE_MODEL", os.getenv("MODEL", "gpt-4o-mini"))
 
 ACCURACY_PROMPT = """
 Your task is to label an answer to a question as ’CORRECT’ or ’WRONG’. You will be given the following data:
@@ -50,8 +69,8 @@ def _extract_json_payload(text: str) -> dict:
 
 def evaluate_llm_judge(question, gold_answer, generated_answer):
     """Evaluate the generated answer against the gold answer using an LLM judge."""
-    response = client.chat.completions.create(
-        model=JUDGE_MODEL,
+    response = _get_client().chat.completions.create(
+        model=_get_judge_model(),
         messages=[
             {
                 "role": "user",
