@@ -6,11 +6,12 @@ import time
 
 from pathlib import Path
 from urllib.error import URLError, HTTPError
-from urllib.request import urlopen
+from urllib.request import ProxyHandler, build_opener
 
 
 EVAL_DIR = Path(__file__).resolve().parent
 DEFAULT_COMPOSE_FILE = EVAL_DIR.parent / "docker-compose.yml"
+NO_PROXY_OPENER = build_opener(ProxyHandler({}))
 
 
 def _log(message: str) -> None:
@@ -51,7 +52,7 @@ def _wait_for_http(url: str, timeout_seconds: float) -> None:
             next_log_time = now + 10
 
         try:
-            with urlopen(url, timeout=3) as response:
+            with NO_PROXY_OPENER.open(url, timeout=3) as response:
                 if response.status < 500:
                     _log(f"HTTP service is ready: {url}")
                     return

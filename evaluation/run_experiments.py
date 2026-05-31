@@ -9,6 +9,20 @@ from src.utils import METHODS, TECHNIQUES
 DEFAULT_TMEM_COMPOSE_FILE = Path(__file__).resolve().parents[1] / "docker-compose.yml"
 
 
+def _ensure_loopback_no_proxy() -> None:
+    loopback_hosts = ["127.0.0.1", "localhost", "::1"]
+    existing = os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or ""
+    entries = [item.strip() for item in existing.split(",") if item.strip()]
+
+    for host in loopback_hosts:
+        if host not in entries:
+            entries.append(host)
+
+    value = ",".join(entries)
+    os.environ["NO_PROXY"] = value
+    os.environ["no_proxy"] = value
+
+
 class Experiment:
     def __init__(self, technique_type, chunk_size):
         self.technique_type = technique_type
@@ -104,6 +118,9 @@ def main():
         openai_manager = OpenAIPredict()
         openai_manager.process_data_file("dataset/locomo10.json", output_file_path)
     elif args.technique_type == "tmem":
+        if args.tmem_full:
+            _ensure_loopback_no_proxy()
+
         if args.tmem_full and not args.skip_tmem_deploy:
             from ensure_tmem_full_infra import ensure_tmem_full_infra
 
