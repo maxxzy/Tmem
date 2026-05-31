@@ -13,6 +13,10 @@ import config
 logger = logging.getLogger(__name__)
 
 
+class LLMConfigurationError(RuntimeError):
+    """Raised when the configured LLM endpoint or model is invalid for TMem runtime."""
+
+
 class LLMService:
     """
     LLM 调用服务
@@ -26,7 +30,20 @@ class LLMService:
         api_key: str = config.LLM_API_KEY,
     ):
         self.model = model
+        self.base_url = base_url
         self.client = OpenAI(base_url=base_url, api_key=api_key)
+
+    def _raise_if_model_missing(self, error: Exception) -> None:
+        message = str(error)
+        lowered = message.lower()
+        if "model" in lowered and "not found" in lowered:
+            raise LLMConfigurationError(
+                "LLM model not found. "
+                f"Current LLM_MODEL={self.model!r}, LLM_BASE_URL={self.base_url!r}. "
+                "Set LLM_MODEL to an exact model name from `ollama list`, or pull it first with "
+                "`ollama pull <model>`. If you also use evaluation answer generation/judging, keep "
+                "MODEL and JUDGE_MODEL aligned with the same installed model name."
+            ) from error
 
     @staticmethod
     def _strip_think(text: str) -> str:
@@ -72,7 +89,11 @@ class LLMService:
         )
         if extra_params:
             kwargs.update(extra_params)
-        response = self.client.chat.completions.create(**kwargs)
+        try:
+            response = self.client.chat.completions.create(**kwargs)
+        except Exception as error:
+            self._raise_if_model_missing(error)
+            raise
         content = response.choices[0].message.content if response.choices else None
         raw = (content or "").strip()
         stripped = self._strip_think(raw)
@@ -150,6 +171,8 @@ class LLMService:
                     normalized.append({"label": item.strip(), "keywords": []})
                 # 其他类型（int, None, list 等）直接跳过
             return normalized if normalized else [{"label": "Unknown Topic", "keywords": []}]
+        except LLMConfigurationError:
+            raise
         except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"Failed to generate topic labels: {e}")
             return [{"label": "Unknown Topic", "keywords": []}]
@@ -203,6 +226,8 @@ class LLMService:
                     f"记忆抽取第 {attempt} 次返回格式异常（非 dict 数组），"
                     f"样例: {memories[0] if memories else 'empty'}"
                 )
+            except LLMConfigurationError:
+                raise
             except (json.JSONDecodeError, Exception) as e:
                 logger.warning(f"记忆抽取第 {attempt} 次失败: {e}")
         logger.warning(f"记忆抽取 {max_attempts} 次均失败，返回空列表")
@@ -225,6 +250,8 @@ class LLMService:
         )
         try:
             return self._chat(system_prompt, user_prompt)
+        except LLMConfigurationError:
+            raise
         except Exception as e:
             logger.warning(f"Failed to generate topic summary for '{topic_label}': {e}")
             return topic_label
@@ -241,6 +268,8 @@ class LLMService:
         )
         try:
             return self._chat(system_prompt, user_prompt).strip('"').strip("'")
+        except LLMConfigurationError:
+            raise
         except Exception as e:
             logger.warning(f"Failed to name cluster {child_labels}: {e}")
             return " & ".join(child_labels[:2])
@@ -261,6 +290,8 @@ class LLMService:
         try:
             answer = self._chat(system_prompt, user_prompt).lower()
             return "yes" in answer
+        except LLMConfigurationError:
+            raise
         except Exception as e:
             logger.warning(f"Failed to judge parent-child '{child_label}' -> '{parent_label}': {e}")
             return False
@@ -306,6 +337,8 @@ class LLMService:
                         result["score"] = 0.5
                 return result
             return None
+        except LLMConfigurationError:
+            raise
         except (json.JSONDecodeError, Exception) as e:
             logger.warning(f"Failed to judge topic association: {e}")
             return None

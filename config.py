@@ -21,8 +21,8 @@ EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 的输出维度
 #   export LLM_MODEL="qwen2.5:7b"                       # Ollama 中的模型名
 #   export LLM_BASE_URL="http://<server_ip>:11434/v1"    # Ollama 的 OpenAI 兼容端点
 #   export LLM_API_KEY="ollama"                          # Ollama 不校验 key，任意非空值即可
-LLM_MODEL = os.environ.get("LLM_MODEL", "qwen3:30b")
-LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
+LLM_MODEL = os.environ.get("LLM_MODEL", os.environ.get("MODEL", "qwen3:30b"))
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", os.environ.get("OPENAI_BASE_URL", "http://127.0.0.1:11434/v1"))
 LLM_API_KEY = os.environ.get("LLM_API_KEY", os.environ.get("OPENAI_API_KEY", "ollama"))
 LLM_TEMPERATURE = 0.3  # 较低温度以获得更稳定的结构化输出
 
